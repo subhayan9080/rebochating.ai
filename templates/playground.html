@@ -1,0 +1,54 @@
+{% extends "layout.html" %}
+{% block title %}Playground{% endblock %}
+{% block page_title %}Playground{% if bot %} — {{ bot.name }}{% endif %}{% endblock %}
+{% block top_actions %}
+{% if bot %}<span class="prov {% if provider=='offline' %}off{% endif %}"><span class="dot"></span>{% if provider=='offline' %}Offline retrieval{% else %}{{ provider }} · {{ model }}{% endif %}</span>
+<button class="btn" onclick="newChat()">New chat</button>{% endif %}
+{% endblock %}
+{% block body %}
+{% if not bot %}<div class="card"><p class="muted">No agents yet.</p></div>
+{% else %}
+<div class="card">
+  <div class="chatbox">
+    <div class="msgs" id="msgs"></div>
+    <div class="suggs" id="suggs"></div>
+    <div class="composer">
+      <input id="inp" placeholder="Ask anything about your knowledge base..." autocomplete="off">
+      <button class="btn btn-primary" onclick="send()">Send</button>
+    </div>
+  </div>
+  <p class="faint small mt">Internal test view — every message is saved to the Inbox. Rate replies with 👍/👎 to track quality in Insights.</p>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if bot %}
+<script>
+const BOT_ID = {{ bot.id }};
+const GREETING = {{ (bot.greeting or "Hi! How can I help you today?")|tojson }};
+const SUGGS = {{ (bot.suggestions or [])|tojson }};
+let convId = null;
+const msgs = document.getElementById('msgs'), inp = document.getElementById('inp');
+inp.addEventListener('keydown', e=>{ if(e.key==='Enter') send(); });
+function addMsg(role, text, cites, mid){ window.buildMsg(msgs, role, text, cites, mid); }
+function showSuggs(){ const box=document.getElementById('suggs'); box.innerHTML='';
+  SUGGS.forEach(s=>{ const b=document.createElement('button'); b.textContent=s; b.onclick=()=>{inp.value=s;send();}; box.appendChild(b); }); }
+async function send(){
+  const text=inp.value.trim(); if(!text) return; inp.value='';
+  addMsg('user', text); window.showTyping(msgs);
+  try{
+    const r=await fetch('/api/bots/'+BOT_ID+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,conversation_id:convId})});
+    const j=await r.json(); window.hideTyping();
+    if(j.error){ window.toast('Error: '+j.error, 'error'); addMsg('bot','Error: '+j.error); return; }
+    convId=j.conversation_id; addMsg('bot', j.reply, j.citations, j.message_id);
+  }catch(e){ window.hideTyping(); addMsg('bot','Network error — is the server running?'); }
+}
+async function newChat(){
+  msgs.innerHTML=''; convId=null;
+  const r=await fetch('/api/bots/'+BOT_ID+'/conversations',{method:'POST'}); const j=await r.json();
+  if(j.greeting) addMsg('bot', j.greeting); showSuggs();
+}
+newChat();
+</script>
+{% endif %}
+{% endblock %}

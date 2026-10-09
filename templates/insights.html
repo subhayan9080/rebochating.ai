@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+{% block title %}Insights{% endblock %}
+{% block page_title %}Insights{% if bot %} — {{ bot.name }}{% endif %}{% endblock %}
+{% block body %}
+<div class="grid g2 mb">
+  <div class="card">
+    <h3>Messages & conversations (14 days)</h3>
+    <canvas id="chart" height="180"></canvas>
+  </div>
+  <div class="card">
+    <h3>Reply ratings</h3>
+    {% set up = ratings.get('1', 0) %}{% set down = ratings.get('-1', 0) %}
+    {% set total = up + down %}
+    {% if total==0 %}<p class="muted">No ratings yet — rate replies in the Playground.</p>
+    {% else %}
+    <div class="row"><span class="badge ok">👍 {{ up }}</span><span class="badge err">👎 {{ down }}</span>
+      <span class="muted small">{{ (100*up/total)|round }}% positive</span></div>
+    <div class="bar mt"><div style="width:{{ (100*up/total)|round }}%"></div></div>
+    {% endif %}
+  </div>
+</div>
+<div class="card">
+  <h3>Top visitor questions</h3>
+  <table class="table">
+    {% for q in top %}<tr><td>{{ q.q[:140] }}</td><td style="text-align:right"><span class="badge">×{{ q.n }}</span></td></tr>
+    {% else %}<tr><td class="muted">No questions yet — share the bot to collect conversations.</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const DAILY = {{ daily_json|safe }};
+window.addEventListener('load', () => window.drawInsights && window.drawInsights('chart', DAILY));
+</script>
+{% endblock %}

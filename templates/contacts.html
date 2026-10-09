@@ -1,0 +1,23 @@
+{% extends "layout.html" %}
+{% block title %}Contacts{% endblock %}
+{% block page_title %}Contacts{% if bot %} — {{ bot.name }}{% endif %}{% endblock %}
+{% block top_actions %}<a class="btn btn-sm" href="{{ url_for('dash.contacts_export') }}">⭳ Export CSV</a>{% endblock %}
+{% block body %}
+<div class="card">
+<table class="table">
+<tr><th>Name</th><th>Email</th><th>Company</th><th>Agent</th><th>Captured</th><th></th></tr>
+{% for c in contacts %}
+<tr>
+  <td><b>{{ c.name or '—' }}</b></td>
+  <td>{{ c.email or '—' }}</td>
+  <td>{{ c.company or '—' }}</td>
+  <td class="faint small">{{ c.bot_name }}</td>
+  <td class="faint small">{{ c.created_at|tsd }}</td>
+  <td style="text-align:right"><form method="post" action="{{ url_for('dash.contact_delete', cid=c.id) }}" onsubmit="return confirm('Remove contact?')"><button class="btn btn-sm btn-danger">Remove</button></form></td>
+</tr>
+{% else %}
+<tr><td colspan="6"><div class="empty"><div class="big">👥</div><p>No contacts yet. Enable “Ask visitors for email” on an agent to capture leads.</p></div></td></tr>
+{% endfor %}
+</table>
+</div>
+{% endblock %}

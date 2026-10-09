@@ -1,0 +1,44 @@
+{% extends "layout.html" %}
+{% block title %}Overview{% endblock %}
+{% block page_title %}Overview{% endblock %}
+{% block top_actions %}
+{% if bot %}<a class="btn btn-primary" href="{{ url_for('dash.playground') }}?bot={{ bot.id }}">Open playground</a>{% endif %}
+{% endblock %}
+{% block body %}
+<div class="card mb" style="display:flex;gap:12px;align-items:center">
+  <span class="prov {% if provider=='offline' %}off{% endif %}"><span class="dot"></span>
+    {% if provider=='offline' %}Offline retrieval — add an API key in Settings for live AI{% else %}Live AI · {{ provider }} · {{ model }}{% endif %}
+  </span>
+  <span class="sp" style="flex:1"></span>
+  {% if bot %}<span class="muted small">Active agent: <b>{{ bot.name }}</b></span>{% endif %}
+</div>
+<div class="grid g4 mb">
+  <div class="stat"><div class="n">{{ stats.bots }}</div><div class="l">AI agents</div></div>
+  <div class="stat"><div class="n">{{ stats.conversations }}</div><div class="l">Conversations</div></div>
+  <div class="stat"><div class="n">{{ stats.messages }}</div><div class="l">Messages</div></div>
+  <div class="stat"><div class="n">{{ stats.contacts }}</div><div class="l">Contacts captured</div></div>
+</div>
+<div class="grid g2">
+  <div class="card">
+    <h3>Getting started</h3>
+    <p class="muted">Train an agent in three steps:</p>
+    <p>1 · <a href="{{ url_for('dash.sources') }}">Add knowledge</a> — paste text, upload files, or crawl your site.<br>
+       2 · <a href="{{ url_for('dash.playground') }}">Test in the playground</a> — verify answers + sources.<br>
+       3 · <a href="{{ url_for('dash.deploy') }}">Deploy</a> — share a link, embed the widget, or call the API.</p>
+    {% if stats.sources==0 %}<p><span class="badge warn">No sources yet</span></p>
+    {% else %}<p><span class="badge ok">{{ stats.sources }} sources · {{ stats.chunks }} chunks indexed</span></p>{% endif %}
+  </div>
+  <div class="card">
+    <h3>Recent conversations</h3>
+    {% if recent %}
+    <table class="table">
+      {% for c in recent %}
+      <tr><td><a href="{{ url_for('dash.inbox', c=c.id) }}">{{ (c.title or c.first_msg or 'Conversation')[:60] }}</a>
+        <div class="faint small">{{ c.bot_name }} · {{ c.channel }} · {{ c.created_at|ts }}</div></td>
+        <td style="text-align:right"><span class="badge">{{ c.status }}</span></td></tr>
+      {% endfor %}
+    </table>
+    {% else %}<p class="muted">No conversations yet. Chat in the playground and they'll appear here.</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

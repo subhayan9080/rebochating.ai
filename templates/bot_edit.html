@@ -1,0 +1,44 @@
+{% extends "layout.html" %}
+{% block title %}{{ bot.name }} settings{% endblock %}
+{% block page_title %}{{ bot.name }}{% endblock %}
+{% block top_actions %}
+<a class="btn" href="{{ url_for('dash.playground') }}?bot={{ bot.id }}">Test in playground</a>
+{% endblock %}
+{% block body %}
+<form method="post">
+<div class="grid g2">
+  <div class="card">
+    <h3>General</h3>
+    <div class="field"><label>Name</label><input type="text" name="name" value="{{ bot.name }}"></div>
+    <div class="field"><label>Description</label><input type="text" name="description" value="{{ bot.description }}" placeholder="What this agent does"></div>
+    <div class="grid g2">
+      <div class="field"><label>Brand color</label><input type="text" name="color" value="{{ bot.color }}"></div>
+      <div class="field"><label>Avatar emoji (optional)</label><input type="text" name="avatar_emoji" value="{{ bot.avatar_emoji }}" placeholder="🤖"></div>
+    </div>
+    <div class="field"><label>Greeting message</label>
+      <textarea name="greeting" rows="2" placeholder="Hi! How can I help you today?">{{ bot.greeting }}</textarea></div>
+    <div class="field"><label>Suggested prompts (up to 4)</label>
+      {% for i in range(4) %}<input type="text" name="sugg{{ i }}" value="{{ (bot.suggestions[i] if bot.suggestions|length>i else '') }}" style="margin-bottom:6px" placeholder="Suggestion {{ i+1 }}">{% endfor %}</div>
+    <label class="check"><input type="checkbox" name="ask_email" {% if bot.ask_email %}checked{% endif %}> Ask visitors for email (lead capture)</label>
+    <div class="field mt"><label>Status</label>
+      <select name="active"><option value="1" {% if bot.active %}selected{% endif %}>Active</option><option value="0" {% if not bot.active %}selected{% endif %}>Paused</option></select></div>
+  </div>
+  <div class="card">
+    <h3>Behaviour &amp; model</h3>
+    <p class="muted small">Live model: {% if provider=='offline' %}<span class="badge warn">offline retrieval</span>{% else %}<span class="badge ok">{{ provider }} · {{ model }}</span>{% endif %}
+    — set keys in <a href="{{ url_for('dash.settings') }}">Settings</a>.</p>
+    <div class="field"><label>Model override (optional)</label><input type="text" name="model" value="{{ bot.model }}" placeholder="Leave blank to use workspace default"></div>
+    <div class="field"><label>Creativity (temperature): <span id="tval">{{ bot.temperature }}</span></label>
+      <input type="range" name="temperature" min="0" max="1" step="0.1" value="{{ bot.temperature }}" oninput="document.getElementById('tval').textContent=this.value" style="width:100%"></div>
+    <div class="field"><label>Custom system instructions (optional)</label>
+      <textarea name="system_prompt" rows="7" placeholder="Leave blank for the default support prompt.">{{ bot.system_prompt }}</textarea></div>
+    <p class="faint small">Slug: <code>/{{ bot.slug }}</code> · {{ bot.chunks|default(0) }} chunks indexed</p>
+  </div>
+</div>
+<div class="row mt">
+  <button class="btn btn-primary" type="submit" name="action" value="save">Save changes</button>
+  <span class="grow" style="flex:1"></span>
+  <button class="btn btn-danger" type="submit" name="action" value="delete" onclick="return confirm('Delete this agent and all its data?')">Delete agent</button>
+</div>
+</form>
+{% endblock %}

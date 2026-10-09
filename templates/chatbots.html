@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+{% block title %}AI agents{% endblock %}
+{% block page_title %}AI agents{% endblock %}
+{% block top_actions %}<button class="btn btn-primary" onclick="document.getElementById('newbot').classList.add('open')">+ New agent</button>{% endblock %}
+{% block body %}
+<div class="grid g3">
+{% for b in bots %}
+  <div class="card">
+    <div class="row mb">
+      <span class="logo" style="background:{{ b.color }}">{{ (b.avatar_emoji or b.name[0]).upper() }}</span>
+      <div class="grow"><h3 style="margin:0">{{ b.name }}</h3>
+      <div class="faint small">/{{ b.slug }} · {{ b.conv_count }} conversations</div></div>
+      {% if not b.active %}<span class="badge warn">paused</span>{% endif %}
+    </div>
+    <p class="muted small">{{ b.description or 'No description yet.' }}</p>
+    <p><span class="badge brand">{{ b.source_count }} sources</span>
+       <span class="badge">{{ b.chunks }} chunks</span></p>
+    <div class="row">
+      <a class="btn btn-sm" href="{{ url_for('dash.chatbot_edit', bot_id=b.id) }}">Configure</a>
+      <a class="btn btn-sm" href="{{ url_for('dash.sources') }}?bot={{ b.id }}">Data sources</a>
+      <a class="btn btn-sm" href="{{ url_for('dash.playground') }}?bot={{ b.id }}">Test</a>
+    </div>
+  </div>
+{% else %}
+  <div class="card"><div class="empty"><div class="big">🤖</div><p>No agents yet.</p></div></div>
+{% endfor %}
+</div>
+<div class="modal-bg" id="newbot">
+  <div class="modal">
+    <h3>Create AI agent</h3>
+    <form method="post" action="{{ url_for('dash.chatbot_new') }}">
+      <div class="field"><label>Name</label><input type="text" name="name" required placeholder="Support assistant"></div>
+      <div class="field"><label>Description</label><input type="text" name="description" placeholder="What does this agent do?"></div>
+      <div class="row"><button class="btn btn-primary" type="submit">Create</button>
+      <button class="btn" type="button" onclick="document.getElementById('newbot').classList.remove('open')">Cancel</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}

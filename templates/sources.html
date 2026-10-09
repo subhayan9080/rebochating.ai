@@ -1,0 +1,93 @@
+{% extends "layout.html" %}
+{% block title %}Data sources{% endblock %}
+{% block page_title %}Data sources{% if bot %} — {{ bot.name }}{% endif %}{% endblock %}
+{% block top_actions %}<button class="btn btn-primary" onclick="document.getElementById('addsrc').classList.add('open')">+ Add source</button>{% endblock %}
+{% block body %}
+{% if not bot %}<div class="card"><p class="muted">Create an agent first.</p></div>
+{% else %}
+<div class="card mb">
+  <h3 style="margin-bottom:4px">Retrieval inspector</h3>
+  <p class="muted small" style="margin-top:0">Type a question to see which chunks the agent would use — great for checking data quality.</p>
+  <div class="row"><input type="text" id="insp-q" placeholder="e.g. What are your prices?" style="flex:1" onkeydown="if(event.key==='Enter')inspect()">
+  <button class="btn" onclick="inspect()">Inspect</button></div>
+  <div id="insp-out" class="mt"></div>
+</div>
+<div class="card mb">
+<table class="table">
+<tr><th>Source</th><th>Type</th><th>Status</th><th>Detail</th><th>Added</th><th></th></tr>
+{% for s in sources %}
+<tr>
+  <td><b>{{ s.name }}</b>{% if s.url %}<div class="faint small">{{ s.url[:70] }}</div>{% endif %}</td>
+  <td><span class="badge brand">{{ s.type }}</span></td>
+  <td>{% if s.status=='ready' %}<span class="badge ok">ready · {{ s.chunk_count }} chunks</span>
+      {% elif s.status=='processing' %}<span class="badge warn">processing</span>
+      {% else %}<span class="badge err" title="{{ s.error }}">error</span>{% endif %}</td>
+  <td class="muted small">{{ s.detail }}{% if s.status=='error' and s.error %}<br><span style="color:#fca5a5">{{ s.error[:160] }}</span>{% endif %}</td>
+  <td class="faint small">{{ s.created_at|tsd }}</td>
+  <td style="white-space:nowrap;text-align:right">
+    <form method="post" action="{{ url_for('dash.source_retry', source_id=s.id) }}" style="display:inline"><button class="btn btn-sm" title="Re-index">↻</button></form>
+    <form method="post" action="{{ url_for('dash.source_delete', source_id=s.id) }}" style="display:inline" onsubmit="return confirm('Delete this source?')"><button class="btn btn-sm btn-danger">Delete</button></form>
+  </td>
+</tr>
+{% else %}
+<tr><td colspan="6"><div class="empty"><div class="big">📚</div><p>No knowledge yet — add text, files, or crawl your website.</p></div></td></tr>
+{% endfor %}
+</table>
+</div>
+<div class="modal-bg" id="addsrc">
+  <div class="modal" style="width:560px">
+    <h3>Add knowledge to {{ bot.name }}</h3>
+    <div class="tabs">
+      <a href="#t-text" class="on" onclick="return srcTab(event,'text')">✏ Text</a>
+      <a href="#t-file" onclick="return srcTab(event,'file')">📄 File</a>
+      <a href="#t-web" onclick="return srcTab(event,'web')">🌐 Website</a>
+    </div>
+    <div id="pane-text">
+      <form method="post" action="{{ url_for('dash.source_text') }}">
+        <div class="field"><label>Name</label><input type="text" name="name" placeholder="e.g. Pricing FAQ"></div>
+        <div class="field"><label>Content</label><textarea name="content" rows="7" placeholder="Paste FAQs, policies, product docs..."></textarea></div>
+        <div class="row"><button class="btn btn-primary" type="submit">Index text</button>
+        <button class="btn" type="button" onclick="document.getElementById('addsrc').classList.remove('open')">Cancel</button></div>
+      </form>
+    </div>
+    <div id="pane-file" style="display:none">
+      <form method="post" action="{{ url_for('dash.source_upload') }}" enctype="multipart/form-data">
+        <div class="field"><label>File (PDF, DOCX, TXT, MD, CSV — max 8 MB)</label><input type="file" name="file" accept=".pdf,.docx,.txt,.md,.csv,.tsv,.json,.html"></div>
+        <div class="row"><button class="btn btn-primary" type="submit">Upload &amp; index</button>
+        <button class="btn" type="button" onclick="document.getElementById('addsrc').classList.remove('open')">Cancel</button></div>
+      </form>
+    </div>
+    <div id="pane-web" style="display:none">
+      <form method="post" action="{{ url_for('dash.source_website') }}">
+        <div class="field"><label>Website URL</label><input type="url" name="url" placeholder="https://example.com"></div>
+        <div class="grid g2">
+          <div class="field"><label>Name (optional)</label><input type="text" name="name" placeholder="Help center"></div>
+          <div class="field"><label>Max pages</label><input type="number" name="max_pages" value="8" min="1" max="25"></div>
+        </div>
+        <div class="row"><button class="btn btn-primary" type="submit">Crawl &amp; index</button>
+        <button class="btn" type="button" onclick="document.getElementById('addsrc').classList.remove('open')">Cancel</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+function srcTab(e, which){
+  e.preventDefault();
+  document.querySelectorAll('#addsrc .tabs a').forEach(a=>a.classList.remove('on'));
+  e.target.classList.add('on');
+  ['text','file','web'].forEach(w=>document.getElementById('pane-'+w).style.display = w===which?'block':'none');
+  return false;
+}
+async function inspect(){
+  const q=document.getElementById('insp-q').value.trim(); if(q.length<2) return;
+  const out=document.getElementById('insp-out'); out.innerHTML='<p class="muted small">Searching chunks…</p>';
+  const r=await fetch('/api/retrieval?q='+encodeURIComponent(q)); const j=await r.json();
+  if(!j.results.length){ out.innerHTML='<p class="muted small">No chunks matched — try different words, or add more content.</p>'; return; }
+  out.innerHTML=j.results.map(h=>'<div style="border-top:1px solid var(--line);padding:8px 0"><span class="badge brand">'+h.source+'</span> <span class="faint small">score '+h.score+'</span><div class="small" style="margin-top:4px"></div></div>').join('');
+  out.querySelectorAll('.small').forEach((d,i)=>d.textContent=j.results[i].preview);
+}
+</script>
+{% endblock %}

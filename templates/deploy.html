@@ -1,0 +1,44 @@
+{% extends "layout.html" %}
+{% block title %}Deploy{% endblock %}
+{% block page_title %}Deploy{% if bot %} — {{ bot.name }}{% endif %}{% endblock %}
+{% block body %}
+{% if not bot %}<div class="card"><p class="muted">Create an agent first.</p></div>
+{% else %}
+<div class="grid g2">
+  <div class="card">
+    <h3>Public chat link</h3>
+    <p class="muted small">Share this link — anyone can chat with {{ bot.name }}. No login required.</p>
+    <div class="row"><input type="text" readonly value="{{ base }}/chat/{{ bot.slug }}" onclick="this.select()" style="flex:1">
+    <button class="btn btn-sm" onclick="navigator.clipboard.writeText('{{ base }}/chat/{{ bot.slug }}')">Copy</button></div>
+    <h3 class="mt">Embed widget</h3>
+    <p class="muted small">Paste before <code>&lt;/body&gt;</code> on your site:</p>
+    <pre class="code">&lt;script src="{{ base }}/widget.js" data-bot="{{ bot.slug }}"&gt;&lt;/script&gt;</pre>
+  </div>
+  <div class="card">
+    <h3>API access</h3>
+    {% if new_key %}<div class="flash ok">New key: <code>{{ new_key }}</code> — copy it now, it won't be shown again.</div>{% endif %}
+    <form method="post" action="{{ url_for('dash.key_new') }}" class="row mb">
+      <input type="text" name="name" placeholder="Key name (e.g. Website)" style="flex:1"><button class="btn btn-primary btn-sm">Create key</button>
+    </form>
+    {% for k in keys %}<div class="row mb"><span class="grow"><b>{{ k.name }}</b> <code>{{ k.prefix }}</code><div class="faint small">created {{ k.created_at|tsd }}{% if k.last_used %} · used {{ k.last_used|tsd }}{% endif %}</div></span>
+    <form method="post" action="{{ url_for('dash.key_delete', kid=k.id) }}" onsubmit="return confirm('Revoke key?')"><button class="btn btn-sm btn-danger">Revoke</button></form></div>
+    {% else %}<p class="muted small">No keys yet.</p>{% endfor %}
+    <h3 class="mt">REST example</h3>
+    <pre class="code">curl -X POST {{ base }}/api/rest/chat \
+  -H "Authorization: Bearer rb-..." \
+  -H "Content-Type: application/json" \
+  -d '{"bot":"{{ bot.slug }}","message":"What are your prices?"}'</pre>
+  </div>
+</div>
+<div class="card mt">
+  <h3>Webhooks</h3>
+  <p class="muted small">Get POSTed JSON on <code>handoff.requested</code> events (e.g. refund requests).</p>
+  <form method="post" action="{{ url_for('dash.hook_new') }}" class="row mb">
+    <input type="url" name="url" placeholder="https://your-server.com/hook" style="flex:1" required><button class="btn btn-primary btn-sm">Add webhook</button>
+  </form>
+  {% for h in hooks %}<div class="row mb"><span class="grow"><code>{{ h.url }}</code></span>
+  <form method="post" action="{{ url_for('dash.hook_delete', wid=h.id) }}"><button class="btn btn-sm btn-danger">Remove</button></form></div>
+  {% else %}<p class="muted small">No webhooks yet.</p>{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

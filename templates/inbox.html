@@ -1,0 +1,74 @@
+{% extends "layout.html" %}
+{% block title %}Inbox{% endblock %}
+{% block page_title %}Inbox{% endblock %}
+{% block top_actions %}
+<form method="get" action="{{ url_for('dash.inbox') }}" style="display:flex;gap:8px;align-items:center">
+  <input type="text" id="inbox-q" placeholder="Search chats..." style="width:200px" autocomplete="off">
+  <select name="status" onchange="this.form.submit()" class="btn">
+    <option value="" {% if not status %}selected{% endif %}>All statuses</option>
+    <option value="open" {% if status=='open' %}selected{% endif %}>Open</option>
+    <option value="resolved" {% if status=='resolved' %}selected{% endif %}>Resolved</option>
+  </select>
+  <a class="btn btn-sm" href="{{ url_for('dash.inbox_export') }}">⭳ Export CSV</a>
+</form>
+{% endblock %}
+{% block body %}
+{% if not convs %}<div class="card"><div class="empty"><div class="big">✉</div><p>No conversations yet. Test the bot in the Playground or share it to collect chats.</p></div></div>
+{% else %}
+<div class="inbox">
+  <div class="conv-list">
+    {% for c in convs %}
+    <a class="conv {% if selected and c.id==selected.id %}on{% endif %}" href="{{ url_for('dash.inbox', c=c.id, status=status or None) }}">
+      <div class="t">{{ (c.title or c.first_msg or 'Conversation')[:55] }}</div>
+      <div class="p">{{ c.bot_name }} · {{ c.channel }} · {{ c.msg_count }} msgs · {{ c.updated_at|ts }}</div>
+    </a>
+    {% endfor %}
+  </div>
+  <div class="card">
+    {% if selected %}
+    <div class="row mb">
+      <div class="grow"><b>{{ (selected.title or 'Conversation')[:80] }}</b>
+        <div class="faint small">{{ selected.name }} {{ selected.email }} · {{ selected.channel }} · <span class="badge">{{ selected.status }}</span></div></div>
+      <form method="post" action="{{ url_for('dash.inbox_status', conv_id=selected.id) }}">
+        <input type="hidden" name="status" value="{{ 'resolved' if selected.status!='resolved' else 'open' }}">
+        <button class="btn btn-sm">{{ 'Resolve' if selected.status!='resolved' else 'Reopen' }}</button>
+      </form>
+      <form method="post" action="{{ url_for('dash.inbox_delete', conv_id=selected.id) }}" onsubmit="return confirm('Delete conversation?')"><button class="btn btn-sm btn-danger">Delete</button></form>
+    </div>
+    <div class="msgs" style="max-height:46vh" id="thread">
+      {% for m in messages %}
+      <div class="msg {% if m.role=='user' %}user{% elif m.role=='agent' %}agent{% else %}bot{% endif %}">{{ m.content }}{% if m.citations %}<span class="cite">Sources: {% for c in m.citations %}{{ c.source }}{% if not loop.last %} · {% endif %}{% endfor %}</span>{% endif %}</div>
+      {% endfor %}
+    </div>
+    <div class="composer">
+      <input id="agent-inp" placeholder="Reply as agent..." autocomplete="off">
+      <button class="btn btn-primary" onclick="agentReply({{ selected.id }})">Reply</button>
+    </div>
+    {% else %}<p class="muted">Select a conversation.</p>{% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+async function agentReply(cid){
+  const el=document.getElementById('agent-inp'); const text=el.value.trim(); if(!text) return; el.value='';
+  const r=await fetch('/api/inbox/'+cid+'/reply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text})});
+  if(r.ok) location.reload(); else window.toast('Reply failed', 'error');
+}
+document.getElementById('agent-inp')?.addEventListener('keydown',e=>{if(e.key==='Enter')agentReply({{ selected.id if selected else 0 }});});
+document.getElementById('thread')?.scrollTo(0,99999);
+// live conversation search
+const sq=document.getElementById('inbox-q');
+if(sq){ let t=null;
+  sq.addEventListener('input',()=>{ clearTimeout(t);
+    t=setTimeout(async()=>{
+      const q=sq.value.trim(); if(q.length<2) return;
+      const r=await fetch('/inbox/search?q='+encodeURIComponent(q)); const j=await r.json();
+      if(j.results.length) window.toast(j.results.length+' match(es): '+j.results.slice(0,3).map(x=>x.title).join(' · '));
+      else window.toast('No matches for "'+q+'"', 'error');
+    },450);
+  });
+}
+</script>
+{% endblock %}

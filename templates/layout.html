@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}Relay{% endblock %} · Relay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pro.css') }}">
+</head>
+<body>
+<div class="shell">
+<aside class="sidebar">
+  <div class="brand"><span class="logo">R</span> Relay</div>
+  <div class="ws">{{ user.workspace if user else 'AI support platform' }}</div>
+  {% if bots %}
+  <div class="bot-switch">
+    <select onchange="location='?bot='+this.value">
+      {% for b in bots %}<option value="{{ b.id }}" {% if bot and b.id==bot.id %}selected{% endif %}>{{ b.name }}</option>{% endfor %}
+    </select>
+    <a class="btn btn-sm" href="{{ url_for('dash.chatbots') }}" title="Manage bots">+</a>
+  </div>
+  {% endif %}
+  <nav class="nav">
+    <div class="nav-cap">Build</div>
+    <a href="{{ url_for('dash.overview') }}" class="{% if request.endpoint=='dash.overview' %}on{% endif %}"><span class="ico">◈</span> Overview</a>
+    <a href="{{ url_for('dash.chatbots') }}" class="{% if request.endpoint in ('dash.chatbots','dash.chatbot_edit') %}on{% endif %}"><span class="ico">🤖</span> AI agents</a>
+    <a href="{{ url_for('dash.sources') }}" class="{% if request.endpoint=='dash.sources' %}on{% endif %}"><span class="ico">📚</span> Data sources</a>
+    <a href="{{ url_for('dash.playground') }}" class="{% if request.endpoint=='dash.playground' %}on{% endif %}"><span class="ico">💬</span> Playground</a>
+    <div class="nav-cap">Manage</div>
+    <a href="{{ url_for('dash.inbox') }}" class="{% if request.endpoint=='dash.inbox' %}on{% endif %}"><span class="ico">✉</span> Inbox</a>
+    <a href="{{ url_for('dash.insights') }}" class="{% if request.endpoint=='dash.insights' %}on{% endif %}"><span class="ico">📊</span> Insights</a>
+    <a href="{{ url_for('dash.contacts') }}" class="{% if request.endpoint=='dash.contacts' %}on{% endif %}"><span class="ico">👥</span> Contacts</a>
+    <div class="nav-cap">Connect</div>
+    <a href="{{ url_for('dash.deploy') }}" class="{% if request.endpoint=='dash.deploy' %}on{% endif %}"><span class="ico">🚀</span> Deploy</a>
+    <a href="{{ url_for('dash.settings') }}" class="{% if request.endpoint=='dash.settings' %}on{% endif %}"><span class="ico">⚙</span> Settings</a>
+  </nav>
+  <div class="side-foot">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="grow" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ user.name if user }}</span>
+      <a href="{{ url_for('auth.logout') }}" class="small">Sign out</a>
+    </div>
+  </div>
+</aside>
+<div class="main">
+  <div class="topbar">
+    <button class="burger" onclick="document.body.classList.toggle('nav-open')">☰</button>
+    <h1>{% block page_title %}Relay{% endblock %}</h1>
+    <span class="sp"></span>
+    {% block top_actions %}{% endblock %}
+  </div>
+  <div class="content">
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+      {% for cat, m in msgs %}<div class="flash {{ 'ok' if cat=='ok' else 'error' }}">{{ m }}</div>{% endfor %}
+    {% endwith %}
+    {% block body %}{% endblock %}
+  </div>
+</div>
+</div>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pro.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

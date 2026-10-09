@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Create account · Relay</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+<div class="auth-wrap">
+<div class="auth-card">
+  <div class="brand" style="padding:0 0 4px"><span class="logo">R</span> Relay</div>
+  <h1>Create your workspace</h1>
+  <p class="sub">Build AI support agents trained on your content.</p>
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, m in msgs %}<div class="flash {{ 'ok' if cat=='ok' else 'error' }}">{{ m }}</div>{% endfor %}
+  {% endwith %}
+  <form method="post">
+    <div class="field"><label>Name</label><input type="text" name="name" required autofocus placeholder="Ada Lovelace"></div>
+    <div class="field"><label>Work email</label><input type="email" name="email" required placeholder="you@company.com"></div>
+    <div class="field"><label>Password</label><input type="password" name="password" required minlength="6" placeholder="Min 6 characters"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center" type="submit">Create account</button>
+  </form>
+  <p class="muted small mt">Have an account? <a href="{{ url_for('auth.login') }}">Sign in</a></p>
+</div>
+</div>
+</body>
+</html>

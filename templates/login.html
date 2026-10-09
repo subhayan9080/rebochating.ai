@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in · Relay</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+<div class="auth-wrap">
+<div class="auth-card">
+  <div class="brand" style="padding:0 0 4px"><span class="logo">R</span> Relay</div>
+  <h1>Welcome back</h1>
+  <p class="sub">Sign in to manage your AI agents.</p>
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, m in msgs %}<div class="flash {{ 'ok' if cat=='ok' else 'error' }}">{{ m }}</div>{% endfor %}
+  {% endwith %}
+  <form method="post">
+    <div class="field"><label>Email</label><input type="email" name="email" required autofocus placeholder="you@company.com"></div>
+    <div class="field"><label>Password</label><input type="password" name="password" required placeholder="••••••••"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center" type="submit">Sign in</button>
+  </form>
+  <p class="muted small mt">No account? <a href="{{ url_for('auth.register') }}">Create one</a></p>
+</div>
+</div>
+</body>
+</html>

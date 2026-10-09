@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ bot.name }} · Relay chat</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+<style>:root{ --bot:{{ bot.color }}; }</style>
+</head>
+<body>
+<div class="pub-wrap">
+  <div class="pub-card">
+    <div class="pub-head"><span class="logo" style="background:{{ bot.color }}">{{ (bot.avatar_emoji or bot.name[0]).upper() }}</span>
+      <div><b>{{ bot.name }}</b><div class="faint small">Typically replies instantly</div></div></div>
+    <div class="msgs" id="msgs" style="min-height:50vh"></div>
+    <div class="suggs" id="suggs"></div>
+    <div class="composer"><input id="inp" placeholder="Type your message..." autocomplete="off"><button class="btn btn-primary" onclick="send()">Send</button></div>
+  </div>
+</div>
+<script>
+const SLUG = {{ bot.slug|tojson }};
+const NEED_EMAIL = {{ 'true' if bot.ask_email else 'false' }};
+window.RELAY_SLUG = SLUG;
+</script>
+<script src="{{ url_for('static', filename='js/public.js') }}"></script>
+</body>
+</html>

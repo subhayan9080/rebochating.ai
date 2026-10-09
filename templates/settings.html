@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+{% block title %}Settings{% endblock %}
+{% block page_title %}Settings{% endblock %}
+{% block body %}
+<div class="grid g2">
+  <div class="card">
+    <h3>Workspace</h3>
+    <form method="post">
+      <input type="hidden" name="form" value="profile">
+      <div class="field"><label>Your name</label><input type="text" name="name" value="{{ user.name }}"></div>
+      <div class="field"><label>Workspace name</label><input type="text" name="workspace" value="{{ user.workspace }}"></div>
+      <div class="field"><label>Email</label><input type="text" value="{{ user.email }}" disabled></div>
+      <button class="btn btn-primary" type="submit">Save</button>
+    </form>
+  </div>
+  <div class="card">
+    <h3>AI provider</h3>
+    <p class="muted small">Current: {% if provider=='offline' %}<span class="badge warn">offline retrieval</span>{% else %}<span class="badge ok">{{ provider }} · {{ model }}</span>{% endif %}</p>
+    <form method="post">
+      <input type="hidden" name="form" value="ai">
+      <div class="field"><label>Provider</label>
+        <select name="ai_provider">
+          <option value="auto" {% if user.ai_provider=='auto' %}selected{% endif %}>Auto-detect from key</option>
+          <option value="openai" {% if user.ai_provider=='openai' %}selected{% endif %}>OpenAI</option>
+          <option value="anthropic" {% if user.ai_provider=='anthropic' %}selected{% endif %}>Anthropic</option>
+          <option value="offline" {% if user.ai_provider=='offline' %}selected{% endif %}>Offline retrieval only</option>
+        </select></div>
+      <div class="field"><label>API key {% if masked %}(saved: {{ masked }}){% endif %}</label>
+        <input type="password" name="ai_api_key" placeholder="{% if masked %}Leave blank to keep saved key{% else %}sk-... / sk-ant-...{% endif %}" autocomplete="off"></div>
+      <div class="field"><label>Model (optional)</label><input type="text" name="ai_model" value="{{ user.ai_model }}" placeholder="gpt-4o-mini / claude-3-5-haiku-latest"></div>
+      <button class="btn btn-primary" type="submit">Save AI settings</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
