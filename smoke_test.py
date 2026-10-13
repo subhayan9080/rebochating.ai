@@ -65,6 +65,44 @@ check("offline RAG answers pricing", r.status_code == 200 and "$49" in j.get("re
 check("citations present", bool(j.get("citations")))
 check("title backfilled", True)
 
+# ---- guardrails (Voiceflow-style safety) ----
+# configure guardrails on the demo bot: escalate on 'refund', low-confidence fallback
+with app.test_request_context():
+    store.update_bot(app, bot["id"], user["id"], guardrails={
+        "confidence_threshold": 0,
+        "fallback_message": "I'm not sure — let me get a human.",
+        "escalate_keywords": ["refund"],
+        "escalation_message": "Escalating to a human now.",
+    })
+r = client.post(f"/api/bots/{bot['id']}/chat", json={"message": "I want a refund please"})
+j = r.get_json() or {}
+check("guardrail keyword escalates", r.status_code == 200 and "Escalating" in j.get("reply", "")
+      and j.get("guardrail") == "escalate", str(j)[:200])
+with app.test_request_context():
+    convs = store.list_conversations(app, user["id"], bot_id=bot["id"], limit=20)
+check("guardrail escalate marks needs_human",
+      any(c["status"] == "needs_human" for c in convs),
+      str([c["status"] for c in convs]))
+
+# low-confidence fallback with a high threshold + gibberish query
+with app.test_request_context():
+    store.update_bot(app, bot["id"], user["id"], guardrails={
+        "confidence_threshold": 99, "fallback_message": "no idea",
+        "escalate_keywords": [], "escalation_message": ""})
+r = client.post(f"/api/bots/{bot['id']}/chat", json={"message": "xylophone quokka zzz"})
+j = r.get_json() or {}
+check("guardrail low-confidence fallback", r.status_code == 200 and "no idea" in j.get("reply", "")
+      and j.get("guardrail") == "fallback", str(j)[:200])
+
+# reset guardrails -> normal answer works again
+with app.test_request_context():
+    store.update_bot(app, bot["id"], user["id"], guardrails={
+        "confidence_threshold": 0, "fallback_message": "", "escalate_keywords": [], "escalation_message": ""})
+r = client.post(f"/api/bots/{bot['id']}/chat", json={"message": "What are your prices?"})
+j = r.get_json() or {}
+check("guardrails off -> normal answer", r.status_code == 200 and "$49" in j.get("reply", "")
+      and j.get("guardrail") is None, str(j)[:200])
+
 # inbox thread exists
 r = client.get("/inbox")
 check("inbox shows chat", b"What are your prices" in r.data)
@@ -110,6 +148,22 @@ r = client.get("/static/js/pro.js")
 check("pro.js serves", r.status_code == 200 and b"drawInsights" in r.data)
 check("public config has avatar", "avatar" in (anon.get(f"/api/public/config?bot={bot['slug']}").get_json() or {}))
 check("widget v2 serves", b"rw-badge" in anon.get("/widget.js").data)
+
+# dark mode / appearance
+r = client.post("/settings/theme", json={"theme": "dark"})
+check("theme endpoint accepts dark", r.status_code == 200 and (r.get_json() or {}).get("theme") == "dark")
+r = client.post("/settings/theme", json={"theme": "bogus"})
+check("theme endpoint rejects invalid", (r.get_json() or {}).get("theme") == "light")
+client.post("/settings/theme", json={"theme": "dark"})  # set dark again for reflection check
+r = client.get("/")
+check("dashboard reflects saved theme", b'data-theme="dark"' in r.data)
+r = client.get("/static/css/pro.css")
+check("dark theme css serves", b'[data-theme="dark"]' in r.data)
+r = client.get("/static/js/app.js")
+check("theme js serves", b"relay-theme" in r.data)
+r = client.get("/settings")
+check("settings has appearance card", b"theme-choice" in r.data)
+client.post("/settings/theme", json={"theme": "light"})  # reset
 
 failed = [c for c in checks if not c[1]]
 print(f"\n{len(checks) - len(failed)}/{len(checks)} passed")

@@ -1,9 +1,19 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="{{ user.theme if user and user.theme else 'light' }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{% block title %}Relay{% endblock %} · Relay</title>
+<script>
+/* Apply saved/system theme before first paint to avoid a flash. */
+(function () {
+  try {
+    var t = localStorage.getItem("relay-theme") || document.documentElement.getAttribute("data-theme") || "light";
+    if (t === "system") t = (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", t === "dark" ? "dark" : "light");
+  } catch (e) {}
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
@@ -12,35 +22,59 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pro.css') }}">
 </head>
 <body>
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="i-bot" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="2.5"/><path d="M12 8V4.5M8.5 4.5h7"/><circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/><path d="M9.5 17.5h5"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 14a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 12.5h5"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="15"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6h.09A1.65 1.65 0 0 0 10 3.09V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></symbol>
+  <symbol id="i-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
+</svg>
 <div class="shell">
 <aside class="sidebar">
   <div class="brand"><span class="logo">R</span> Relay</div>
   <div class="ws">{{ user.workspace if user else 'AI support platform' }}</div>
-  {% if bots %}
-  <div class="bot-switch">
-    <select onchange="location='?bot='+this.value">
-      {% for b in bots %}<option value="{{ b.id }}" {% if bot and b.id==bot.id %}selected{% endif %}>{{ b.name }}</option>{% endfor %}
-    </select>
-    <a class="btn btn-sm" href="{{ url_for('dash.chatbots') }}" title="Manage bots">+</a>
-  </div>
+  {% if bot %}
+  <a class="agent-card" href="{{ url_for('dash.chatbots') }}" title="Manage agents">
+    <span class="ac-ava" style="background:{{ bot.color }}">{{ (bot.avatar_emoji or bot.name[0]).upper() }}</span>
+    <span class="ac-txt">
+      <span class="ac-name">{{ bot.name }}</span>
+      <span class="ac-sub"><span class="prov"><span class="dot"></span>{{ 'Active' if bot.active else 'Paused' }}</span></span>
+    </span>
+    <svg class="ac-caret"><use href="#i-dot"/></svg>
+  </a>
+  {% elif bots %}
+  <a class="agent-card" href="{{ url_for('dash.chatbots') }}">
+    <span class="ac-ava ac-ava--ph">+</span>
+    <span class="ac-txt"><span class="ac-name">Select an agent</span><span class="ac-sub"><span class="prov off"><span class="dot"></span>None</span></span></span>
+  </a>
   {% endif %}
   <nav class="nav">
     <div class="nav-cap">Build</div>
-    <a href="{{ url_for('dash.overview') }}" class="{% if request.endpoint=='dash.overview' %}on{% endif %}"><span class="ico">◈</span> Overview</a>
-    <a href="{{ url_for('dash.chatbots') }}" class="{% if request.endpoint in ('dash.chatbots','dash.chatbot_edit') %}on{% endif %}"><span class="ico">🤖</span> AI agents</a>
-    <a href="{{ url_for('dash.sources') }}" class="{% if request.endpoint=='dash.sources' %}on{% endif %}"><span class="ico">📚</span> Data sources</a>
-    <a href="{{ url_for('dash.playground') }}" class="{% if request.endpoint=='dash.playground' %}on{% endif %}"><span class="ico">💬</span> Playground</a>
+    <a href="{{ url_for('dash.overview') }}" class="{% if request.endpoint=='dash.overview' %}on{% endif %}"><svg class="ico"><use href="#i-grid"/></svg> Overview</a>
+    <a href="{{ url_for('dash.chatbots') }}" class="{% if request.endpoint in ('dash.chatbots','dash.chatbot_edit') %}on{% endif %}"><svg class="ico"><use href="#i-bot"/></svg> AI agents</a>
+    <a href="{{ url_for('dash.sources') }}" class="{% if request.endpoint=='dash.sources' %}on{% endif %}"><svg class="ico"><use href="#i-book"/></svg> Data sources</a>
+    <a href="{{ url_for('dash.playground') }}" class="{% if request.endpoint=='dash.playground' %}on{% endif %}"><svg class="ico"><use href="#i-chat"/></svg> Playground</a>
     <div class="nav-cap">Manage</div>
-    <a href="{{ url_for('dash.inbox') }}" class="{% if request.endpoint=='dash.inbox' %}on{% endif %}"><span class="ico">✉</span> Inbox</a>
-    <a href="{{ url_for('dash.insights') }}" class="{% if request.endpoint=='dash.insights' %}on{% endif %}"><span class="ico">📊</span> Insights</a>
-    <a href="{{ url_for('dash.contacts') }}" class="{% if request.endpoint=='dash.contacts' %}on{% endif %}"><span class="ico">👥</span> Contacts</a>
+    <a href="{{ url_for('dash.inbox') }}" class="{% if request.endpoint in ('dash.inbox','dash.inbox_status','dash.inbox_delete') %}on{% endif %}"><svg class="ico"><use href="#i-inbox"/></svg> Inbox{% if unread_count %}<span class="nav-badge">{{ unread_count }}</span>{% endif %}</a>
+    <a href="{{ url_for('dash.insights') }}" class="{% if request.endpoint=='dash.insights' %}on{% endif %}"><svg class="ico"><use href="#i-chart"/></svg> Insights</a>
+    <a href="{{ url_for('dash.contacts') }}" class="{% if request.endpoint=='dash.contacts' %}on{% endif %}"><svg class="ico"><use href="#i-users"/></svg> Contacts</a>
     <div class="nav-cap">Connect</div>
-    <a href="{{ url_for('dash.deploy') }}" class="{% if request.endpoint=='dash.deploy' %}on{% endif %}"><span class="ico">🚀</span> Deploy</a>
-    <a href="{{ url_for('dash.settings') }}" class="{% if request.endpoint=='dash.settings' %}on{% endif %}"><span class="ico">⚙</span> Settings</a>
+    <a href="{{ url_for('dash.deploy') }}" class="{% if request.endpoint=='dash.deploy' %}on{% endif %}"><svg class="ico"><use href="#i-send"/></svg> Deploy</a>
+    <a href="{{ url_for('dash.settings') }}" class="{% if request.endpoint=='dash.settings' %}on{% endif %}"><svg class="ico"><use href="#i-gear"/></svg> Settings</a>
   </nav>
   <div class="side-foot">
-    <div style="display:flex;align-items:center;gap:8px">
-      <span class="grow" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ user.name if user }}</span>
+    <div class="row" style="gap:9px">
+      <span class="sf-ava">{{ (user.name[0] if user else '?').upper() }}</span>
+      <span class="grow" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ user.name if user }}</span>
       <a href="{{ url_for('auth.logout') }}" class="small">Sign out</a>
     </div>
   </div>
@@ -48,8 +82,20 @@
 <div class="main">
   <div class="topbar">
     <button class="burger" onclick="document.body.classList.toggle('nav-open')">☰</button>
-    <h1>{% block page_title %}Relay{% endblock %}</h1>
+    <div class="tb-title">
+      <h1>{% block page_title %}Relay{% endblock %}</h1>
+      {% block page_sub %}{% endblock %}
+    </div>
     <span class="sp"></span>
+    <button class="theme-toggle" id="themeToggle" type="button" title="Toggle dark mode" aria-label="Toggle dark mode">
+      <svg class="ico ic-sun"><use href="#i-sun"/></svg>
+      <svg class="ico ic-moon"><use href="#i-moon"/></svg>
+    </button>
+    <a class="tb-search" href="{{ url_for('dash.inbox') }}" title="Search conversations">
+      <svg class="ico"><use href="#i-search"/></svg>
+      <span class="tb-search-ph">Search…</span>
+      <span class="kbd">⌘K</span>
+    </a>
     {% block top_actions %}{% endblock %}
   </div>
   <div class="content">

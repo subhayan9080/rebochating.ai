@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users(
   ai_provider TEXT DEFAULT 'auto',
   ai_api_key TEXT DEFAULT '',
   ai_model TEXT DEFAULT '',
+  theme TEXT DEFAULT 'light',
   created_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS bots(
@@ -33,6 +34,8 @@ CREATE TABLE IF NOT EXISTS bots(
   system_prompt TEXT DEFAULT '',
   ask_email INTEGER DEFAULT 1,
   active INTEGER DEFAULT 1,
+  guardrails TEXT DEFAULT '',
+  flow TEXT DEFAULT '',
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
@@ -133,6 +136,22 @@ def init_db(db_path: str) -> None:
     conn = connect(db_path)
     try:
         conn.executescript(SCHEMA)
+        # lightweight migrations: add columns introduced after initial release
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
+        if "theme" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN theme TEXT DEFAULT 'light'")
+        bcols = {r["name"] for r in conn.execute("PRAGMA table_info(bots)").fetchall()}
+        if "guardrails" not in bcols:
+            conn.execute("ALTER TABLE bots ADD COLUMN guardrails TEXT DEFAULT ''")
+        if "flow" not in bcols:
+            conn.execute("ALTER TABLE bots ADD COLUMN flow TEXT DEFAULT ''")
+        ccols = {r["name"] for r in conn.execute("PRAGMA table_info(conversations)").fetchall()}
+        if "flow_node" not in ccols:
+            conn.execute("ALTER TABLE conversations ADD COLUMN flow_node TEXT DEFAULT ''")
+        if "flow_ctx" not in ccols:
+            conn.execute("ALTER TABLE conversations ADD COLUMN flow_ctx TEXT DEFAULT '{}'")
+        if "intent" not in ccols:
+            conn.execute("ALTER TABLE conversations ADD COLUMN intent TEXT DEFAULT ''")
         conn.commit()
     finally:
         conn.close()
@@ -142,12 +161,13 @@ def row_to_dict(row: sqlite3.Row | None) -> dict | None:
     if row is None:
         return None
     d = dict(row)
-    for k in ("suggestions", "citations"):
+    for k in ("suggestions", "citations", "guardrails", "flow_ctx"):
         if k in d and isinstance(d[k], str):
+            default = "{}" if k in ("guardrails", "flow_ctx") else "[]"
             try:
-                d[k] = json.loads(d[k] or "[]")
+                d[k] = json.loads(d[k] or default)
             except (ValueError, TypeError):
-                d[k] = []
+                d[k] = {} if k in ("guardrails", "flow_ctx") else []
     return d
 
 

@@ -1,44 +1,114 @@
 {% extends "layout.html" %}
 {% block title %}Overview{% endblock %}
 {% block page_title %}Overview{% endblock %}
+{% block page_sub %}{% if bot %}Activity for <b>{{ bot.name }}</b> · last 14 days{% else %}Your AI support workspace at a glance{% endif %}{% endblock %}
 {% block top_actions %}
+<a class="btn" href="{{ url_for('dash.inbox') }}">Inbox</a>
 {% if bot %}<a class="btn btn-primary" href="{{ url_for('dash.playground') }}?bot={{ bot.id }}">Open playground</a>{% endif %}
 {% endblock %}
 {% block body %}
-<div class="card mb" style="display:flex;gap:12px;align-items:center">
-  <span class="prov {% if provider=='offline' %}off{% endif %}"><span class="dot"></span>
-    {% if provider=='offline' %}Offline retrieval — add an API key in Settings for live AI{% else %}Live AI · {{ provider }} · {{ model }}{% endif %}
-  </span>
-  <span class="sp" style="flex:1"></span>
-  {% if bot %}<span class="muted small">Active agent: <b>{{ bot.name }}</b></span>{% endif %}
+
+{# ---------- agent hero ---------- #}
+<div class="hero mb">
+  <span class="hero-ava" style="background:{{ bot.color if bot else '#4f46e5' }}">{{ (bot.avatar_emoji or (bot.name[0] if bot else 'R')).upper() }}</span>
+  <div class="hero-txt">
+    <div class="hero-name">{{ bot.name if bot else 'Relay workspace' }}</div>
+    <div class="hero-meta">
+      <span class="prov {% if provider=='offline' %}off{% endif %}"><span class="dot"></span>
+        {% if provider=='offline' %}Offline retrieval{% else %}Live AI · {{ provider }} · {{ model }}{% endif %}</span>
+      {% if bot %}<span class="muted small">/{{ bot.slug }}</span>{% endif %}
+    </div>
+  </div>
+  <span class="sp"></span>
+  <div class="hero-acts">
+    <a class="btn btn-sm" href="{{ url_for('dash.sources') }}">Knowledge</a>
+    <a class="btn btn-sm" href="{{ url_for('dash.deploy') }}">Deploy</a>
+  </div>
 </div>
+
+{# ---------- KPI tiles ---------- #}
 <div class="grid g4 mb">
-  <div class="stat"><div class="n">{{ stats.bots }}</div><div class="l">AI agents</div></div>
-  <div class="stat"><div class="n">{{ stats.conversations }}</div><div class="l">Conversations</div></div>
-  <div class="stat"><div class="n">{{ stats.messages }}</div><div class="l">Messages</div></div>
-  <div class="stat"><div class="n">{{ stats.contacts }}</div><div class="l">Contacts captured</div></div>
+  <div class="stat">
+    <div class="n"><span class="cnt" data-to="{{ conv7 }}">0</span><span class="delta {{ conv_dir }}">{{ '▲' if conv_dir=='up' else ('▼' if conv_dir=='down' else '–') }} {{ conv_pct }}%</span></div>
+    <div class="l">Conversations · 7d</div>
+    <canvas class="spark" data-k="conversations" height="34"></canvas>
+  </div>
+  <div class="stat">
+    <div class="n"><span class="cnt" data-to="{{ msg7 }}">0</span><span class="delta {{ msg_dir }}">{{ '▲' if msg_dir=='up' else ('▼' if msg_dir=='down' else '–') }} {{ msg_pct }}%</span></div>
+    <div class="l">Messages · 7d</div>
+    <canvas class="spark" data-k="messages" height="34"></canvas>
+  </div>
+  <div class="stat">
+    <div class="n"><span class="cnt" data-to="{{ sat }}">0</span>{% if rate_total %}%<span class="delta {{ 'up' if sat>=70 else ('down' if sat<50 else 'flat') }}">{{ '👍' if sat>=70 else ('👎' if sat<50 else '–') }}</span>{% else %}%{% endif %}</div>
+    <div class="l">Satisfaction{% if rate_total %} · 👍{{ up }} / 👎{{ down }}{% endif %}</div>
+  </div>
+  <div class="stat">
+    <div class="n"><span class="cnt" data-to="{{ stats.contacts }}">0</span></div>
+    <div class="l">Contacts captured</div>
+  </div>
 </div>
-<div class="grid g2">
+
+{# ---------- chart + getting started ---------- #}
+<div class="grid g2 mb" style="grid-template-columns:1.7fr 1fr">
   <div class="card">
-    <h3>Getting started</h3>
-    <p class="muted">Train an agent in three steps:</p>
-    <p>1 · <a href="{{ url_for('dash.sources') }}">Add knowledge</a> — paste text, upload files, or crawl your site.<br>
-       2 · <a href="{{ url_for('dash.playground') }}">Test in the playground</a> — verify answers + sources.<br>
-       3 · <a href="{{ url_for('dash.deploy') }}">Deploy</a> — share a link, embed the widget, or call the API.</p>
-    {% if stats.sources==0 %}<p><span class="badge warn">No sources yet</span></p>
-    {% else %}<p><span class="badge ok">{{ stats.sources }} sources · {{ stats.chunks }} chunks indexed</span></p>{% endif %}
+    <div class="sec-head">
+      <h3 class="sec-title">Conversations &amp; messages</h3>
+      <span class="muted small">last 14 days</span>
+    </div>
+    {% if daily %}<canvas id="chart" height="190"></canvas>
+    {% else %}<div class="empty"><div class="big">📈</div><p>No activity yet. Chat in the playground to see trends here.</p></div>{% endif %}
   </div>
   <div class="card">
-    <h3>Recent conversations</h3>
+    <div class="sec-head"><h3 class="sec-title">Getting started</h3><span class="muted small">{{ done }}/3</span></div>
+    <div class="prog mb"><i style="width:{{ (done*100/3)|round }}%"></i></div>
+    <ul class="check-list">
+      <li class="{{ 'done' if stats.sources>0 else '' }}"><span class="tick">{% if stats.sources>0 %}✓{% else %}1{% endif %}</span>
+        <span><a href="{{ url_for('dash.sources') }}">Add knowledge</a>{% if stats.sources==0 %} — paste text, upload files, or crawl your site.{% else %} — {{ stats.sources }} sources · {{ stats.chunks }} chunks indexed.{% endif %}</span></li>
+      <li><span class="tick">2</span><span><a href="{{ url_for('dash.playground') }}">Test in the playground</a> — verify answers + sources.</span></li>
+      <li><span class="tick">3</span><span><a href="{{ url_for('dash.deploy') }}">Deploy</a> — share a link, embed the widget, or call the API.</span></li>
+    </ul>
+  </div>
+</div>
+
+{# ---------- top questions + recent ---------- #}
+<div class="grid g2">
+  <div class="card">
+    <div class="sec-head"><h3 class="sec-title">Top visitor questions</h3></div>
+    <div class="blist">
+      {% for q in top %}
+      <div class="row-i">
+        <div class="lab"><span>{{ q.q[:90] }}</span><b>×{{ q.n }}</b></div>
+        <div class="track"><i style="width:{{ (100*q.n/top[0].n)|round }}%"></i></div>
+      </div>
+      {% else %}<p class="muted">No questions yet — share your bot to collect conversations.</p>{% endfor %}
+    </div>
+  </div>
+  <div class="card">
+    <div class="sec-head"><h3 class="sec-title">Recent conversations</h3><a class="small" href="{{ url_for('dash.inbox') }}">View all →</a></div>
     {% if recent %}
-    <table class="table">
+    <div class="conv-feed">
       {% for c in recent %}
-      <tr><td><a href="{{ url_for('dash.inbox', c=c.id) }}">{{ (c.title or c.first_msg or 'Conversation')[:60] }}</a>
-        <div class="faint small">{{ c.bot_name }} · {{ c.channel }} · {{ c.created_at|ts }}</div></td>
-        <td style="text-align:right"><span class="badge">{{ c.status }}</span></td></tr>
+      <a class="conv-row" href="{{ url_for('dash.inbox', c=c.id) }}">
+        <span class="conv-ava">{{ (c.first_msg or c.title or '?')[0]|upper }}</span>
+        <span class="conv-main">
+          <span class="conv-title">{{ (c.title or c.first_msg or 'Conversation')[:56] }}</span>
+          <span class="conv-sub">{{ c.bot_name }} · {{ c.channel }} · {{ c.created_at|ts }}</span>
+        </span>
+        <span class="badge {{ 'ok' if c.status=='resolved' else '' }}">{{ c.status }}</span>
+      </a>
       {% endfor %}
-    </table>
+    </div>
     {% else %}<p class="muted">No conversations yet. Chat in the playground and they'll appear here.</p>{% endif %}
   </div>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+const DAILY = {{ daily_json|safe }};
+window.addEventListener('load', () => {
+  window.animateInsights && window.animateInsights('chart', DAILY);
+  window.drawSparks && window.drawSparks(DAILY);
+  window.countUp && window.countUp();
+});
+</script>
 {% endblock %}

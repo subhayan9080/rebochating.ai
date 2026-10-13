@@ -31,5 +31,22 @@
       <button class="btn btn-primary" type="submit">Save AI settings</button>
     </form>
   </div>
+  <div class="card">
+    <h3>Appearance</h3>
+    <p class="muted small">Choose how Relay looks. "System" follows your device's light/dark setting.</p>
+    <div class="theme-choices">
+      {% set cur = user.theme or 'light' %}
+      <button type="button" class="theme-choice {% if cur=='light' %}on{% endif %}" data-theme-choice="light">
+        <svg class="ico"><use href="#i-sun"/></svg><span>Light</span>
+      </button>
+      <button type="button" class="theme-choice {% if cur=='dark' %}on{% endif %}" data-theme-choice="dark">
+        <svg class="ico"><use href="#i-moon"/></svg><span>Dark</span>
+      </button>
+      <button type="button" class="theme-choice {% if cur=='system' %}on{% endif %}" data-theme-choice="system">
+        <svg class="ico"><use href="#i-monitor"/></svg><span>System</span>
+      </button>
+    </div>
+    <p class="faint small mt">Saved automatically. You can also toggle instantly from the ☀ / ☾ button in the top bar.</p>
+  </div>
 </div>
 {% endblock %}

@@ -77,7 +77,7 @@ def get_user(app, uid):
 
 
 def update_user(app, uid, **fields):
-    allowed = {"name", "workspace", "ai_provider", "ai_api_key", "ai_model"}
+    allowed = {"name", "workspace", "ai_provider", "ai_api_key", "ai_model", "theme"}
     sets = [f"{k}=?" for k in fields if k in allowed]
     if not sets:
         return
@@ -135,7 +135,7 @@ def create_bot(app, user_id, name, description="", **kw):
 
 def update_bot(app, bot_id, user_id, **fields):
     allowed = {"name", "description", "color", "avatar_emoji", "greeting", "model",
-               "temperature", "system_prompt", "ask_email", "active"}
+               "temperature", "system_prompt", "ask_email", "active", "guardrails", "flow"}
     sets, vals = [], []
     for k, v in fields.items():
         if k not in allowed:
@@ -144,6 +144,9 @@ def update_bot(app, bot_id, user_id, **fields):
             v = max(0.0, min(1.5, float(v or 0)))
         if k in ("ask_email", "active"):
             v = int(bool(v))
+        if k in ("guardrails", "flow"):
+            # accept dict/list (serialize) or a raw JSON string
+            v = v if isinstance(v, str) else json.dumps(v)
         sets.append(f"{k}=?")
         vals.append(v)
     if not sets:
@@ -311,7 +314,7 @@ def list_conversations(app, user_id, bot_id=None, status=None, limit=100):
 
 
 def set_conversation(app, conv_id, user_id, **fields):
-    allowed = {"status", "satisfaction", "name", "email", "title"}
+    allowed = {"status", "satisfaction", "name", "email", "title", "flow_node", "flow_ctx", "intent"}
     sets = [f"{k}=?" for k in fields if k in allowed]
     if not sets:
         return

@@ -34,6 +34,20 @@
       <textarea name="system_prompt" rows="7" placeholder="Leave blank for the default support prompt.">{{ bot.system_prompt }}</textarea></div>
     <p class="faint small">Slug: <code>/{{ bot.slug }}</code> · {{ bot.chunks|default(0) }} chunks indexed</p>
   </div>
+  <div class="card">
+    <h3>🛡️ Guardrails</h3>
+    <p class="muted small">Safety rules that run before answering. Leave the threshold at <b>0</b> to disable low-confidence fallback.</p>
+    <div class="field"><label>Minimum confidence to answer (0–10)</label>
+      <input type="number" name="confidence_threshold" min="0" max="10" step="0.1" value="{{ guardrails.confidence_threshold }}" placeholder="0">
+      <div class="faint small mt">If the best knowledge-base match scores below this, the bot uses the fallback message instead of guessing.</div></div>
+    <div class="field"><label>Low-confidence fallback message</label>
+      <textarea name="fallback_message" rows="2" placeholder="I'm not fully sure about that — let me connect you with a teammate.">{{ guardrails.fallback_message }}</textarea></div>
+    <div class="field"><label>Escalate to a human on these keywords (comma-separated)</label>
+      <input type="text" name="escalate_keywords" value="{{ guardrails.escalate_keywords|join(', ') }}" placeholder="refund, cancel, lawyer, complaint">
+      <div class="faint small mt">Matching messages are flagged <b>Needs human</b> in the Inbox and fire your handoff webhook.</div></div>
+    <div class="field"><label>Escalation message</label>
+      <textarea name="escalation_message" rows="2" placeholder="I've flagged this for a human agent who will follow up shortly.">{{ guardrails.escalation_message }}</textarea></div>
+  </div>
 </div>
 <div class="row mt">
   <button class="btn btn-primary" type="submit" name="action" value="save">Save changes</button>

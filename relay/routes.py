@@ -43,15 +43,43 @@ def active_bot(app, user, bots):
 def overview():
     app, user, bots = ctx()
     bot = active_bot(app, user, bots)
+    bid = bot["id"] if bot else None
     stats = store.overview_stats(app, user["id"])
-    recent = store.list_conversations(app, user["id"], bot_id=bot["id"] if bot else None, limit=6)
+    recent = store.list_conversations(app, user["id"], bot_id=bid, limit=6)
+    daily = store.daily_counts(app, user["id"], bot_id=bid, days=14)
+    top = store.top_questions(app, user["id"], bot_id=bid, limit=6)
+    ratings = store.rating_summary(app, user["id"], bot_id=bid)
+    # period-over-period deltas (last 7d vs previous 7d)
+    cut = time.time() - 7 * 86400
+    conv7 = sum(d["conversations"] for d in daily if d["day"] >= cut)
+    conv_prev = sum(d["conversations"] for d in daily if d["day"] < cut)
+    msg7 = sum(d["messages"] for d in daily if d["day"] >= cut)
+    msg_prev = sum(d["messages"] for d in daily if d["day"] < cut)
+
+    def _delta(cur, prev):
+        if not prev:
+            return ("up" if cur else "flat"), (100 if cur else 0)
+        pct = round((cur - prev) * 100 / prev)
+        return ("up" if pct > 0 else "down" if pct < 0 else "flat"), abs(pct)
+
+    conv_dir, conv_pct = _delta(conv7, conv_prev)
+    msg_dir, msg_pct = _delta(msg7, msg_prev)
+    up = ratings.get("1", 0)
+    down = ratings.get("-1", 0)
+    rt = up + down
+    sat = round(100 * up / rt) if rt else 0
+    done = 1 if stats["sources"] > 0 else 0
     try:
         from .rag import resolve_provider
         provider, _, model = resolve_provider(app, user)
     except Exception:
         provider, model = "offline", ""
     return render_template("overview.html", user=user, bots=bots, bot=bot, stats=stats,
-                           recent=recent, provider=provider, model=model)
+                           recent=recent, provider=provider, model=model,
+                           daily=daily, top=top, up=up, down=down, sat=sat, rate_total=rt,
+                           conv7=conv7, msg7=msg7, conv_dir=conv_dir, conv_pct=conv_pct,
+                           msg_dir=msg_dir, msg_pct=msg_pct, done=done,
+                           daily_json=json.dumps(daily))
 
 
 # ------------------------------------------------------------------ chatbots
@@ -96,6 +124,18 @@ def chatbot_edit(bot_id):
             return redirect(url_for("dash.chatbots"))
         suggestions = [request.form.get(f"sugg{i}", "").strip() for i in range(4)]
         store.update_bot_suggestions(app, bot_id, user["id"], suggestions)
+        # guardrails (Voiceflow-style safety)
+        kw_raw = request.form.get("escalate_keywords", "")
+        try:
+            threshold = float(request.form.get("confidence_threshold", 0) or 0)
+        except (ValueError, TypeError):
+            threshold = 0.0
+        guardrails = {
+            "confidence_threshold": threshold,
+            "fallback_message": request.form.get("fallback_message", "").strip(),
+            "escalate_keywords": [k.strip() for k in kw_raw.split(",") if k.strip()][:12],
+            "escalation_message": request.form.get("escalation_message", "").strip(),
+        }
         store.update_bot(app, bot_id, user["id"],
                          name=request.form.get("name", bot["name"]).strip() or bot["name"],
                          description=request.form.get("description", ""),
@@ -106,7 +146,8 @@ def chatbot_edit(bot_id):
                          temperature=request.form.get("temperature", 0.4),
                          system_prompt=request.form.get("system_prompt", ""),
                          ask_email=1 if request.form.get("ask_email") else 0,
-                         active=0 if request.form.get("active") == "0" else 1)
+                         active=0 if request.form.get("active") == "0" else 1,
+                         guardrails=guardrails)
         flash("Chatbot settings saved.", "ok")
         return redirect(url_for("dash.chatbot_edit", bot_id=bot_id))
     bot["chunks"] = store.count_chunks(app, bot["id"])
@@ -115,8 +156,10 @@ def chatbot_edit(bot_id):
         provider, _, model = resolve_provider(app, user)
     except Exception:
         provider, model = "offline", ""
+    from .chat import get_guardrails
+    guardrails = get_guardrails(bot)
     return render_template("bot_edit.html", user=user, bots=bots, bot=bot,
-                           provider=provider, model=model)
+                           provider=provider, model=model, guardrails=guardrails)
 
 
 # ------------------------------------------------------------------ sources
@@ -494,6 +537,12 @@ def settings():
                               ai_api_key=request.form.get("ai_api_key", "").strip(),
                               ai_model=request.form.get("ai_model", "").strip())
             flash("AI provider settings saved.", "ok")
+        elif form == "theme":
+            theme = request.form.get("theme", "light")
+            if theme not in ("light", "dark", "system"):
+                theme = "light"
+            store.update_user(app, user["id"], theme=theme)
+            flash("Appearance updated.", "ok")
         return redirect(url_for("dash.settings"))
     user = store.get_user(app, user["id"])
     try:
@@ -504,6 +553,18 @@ def settings():
     masked = ("..." + user["ai_api_key"][-4:]) if user.get("ai_api_key") else ""
     return render_template("settings.html", user=user, bots=bots, bot=bot,
                            provider=provider, model=model, masked=masked)
+
+
+@bp.route("/settings/theme", methods=["POST"])
+@login_required
+def set_theme():
+    """AJAX: persist the chosen appearance (light/dark/system) without a reload."""
+    app, user, _ = ctx()
+    theme = (request.get_json(silent=True) or request.form).get("theme", "light")
+    if theme not in ("light", "dark", "system"):
+        theme = "light"
+    store.update_user(app, user["id"], theme=theme)
+    return jsonify(ok=True, theme=theme)
 
 
 @bp.route("/api/health")
