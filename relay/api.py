@@ -211,4 +211,111 @@ def public_chat(slug):
     return render_template("chat_public.html", bot=bot)
 
 
+# ------------------------------------------------------------------ flow API
+
+@bp.route("/api/flows", methods=["GET"])
+def api_list_flows():
+    user = current_user(current_app)
+    if not user:
+        return jsonify(error="Login required"), 401
+    flows = store.list_flows(current_app, user["id"])
+    return jsonify(flows=flows)
+
+
+@bp.route("/api/flows", methods=["POST"])
+def api_create_flow():
+    user = current_user(current_app)
+    if not user:
+        return jsonify(error="Login required"), 401
+    data = request.get_json(force=True, silent=True) or {}
+    name = data.get("name", "").strip()
+    description = data.get("description", "").strip()
+    if not name:
+        return jsonify(error="Name required"), 400
+    fid = store.create_flow(current_app, user["id"], name, description)
+    return jsonify(flow_id=fid), 201
+
+
+@bp.route("/api/flows/<int:flow_id>", methods=["GET"])
+def api_get_flow(flow_id):
+    user = current_user(current_app)
+    if not user:
+        return jsonify(error="Login required"), 401
+    flow = store.get_flow(current_app, flow_id, user["id"])
+    if not flow:
+        return jsonify(error="Flow not found"), 404
+    nodes = store.get_flow_nodes(current_app, flow_id)
+    definition = store.get_published_flow(current_app, flow_id)
+    return jsonify(flow=flow, nodes=nodes, published=definition)
+
+
+@bp.route("/api/flows/<int:flow_id>", methods=["PUT"])
+def api_update_flow(flow_id):
+    user = current_user(current_app)
+    if not user:
+        return jsonify(error="Login required"), 401
+    flow = store.get_flow(current_app, flow_id, user["id"])
+    if not flow:
+        return jsonify(error="Flow not found"), 404
+    data = request.get_json(force=True, silent=True) or {}
+    if "name" in data:
+        store.update_flow(current_app, flow_id, user["id"], name=data["name"])
+    if "description" in data:
+        store.update_flow(current_app, flow_id, user["id"], description=data["description"])
+    if "nodes" in data:
+        store.replace_flow_nodes(current_app, flow_id, data["nodes"])
+    return jsonify(ok=True)
+
+
+@bp.route("/api/flows/<int:flow_id>/publish", methods=["POST"])
+def api_publish_flow(flow_id):
+    user = current_user(current_app)
+    if not user:
+        return jsonify(error="Login required"), 401
+    ver = store.publish_flow(current_app, flow_id, user["id"])
+    if not ver:
+        return jsonify(error="Flow not found"), 404
+    return jsonify(version=ver, published=True)
+
+
+@bp.route("/api/flows/<int:flow_id>/assign", methods=["POST"])
+def api_assign_flow(flow_id):
+    user = current_user(current_app)
+    if not user:
+        return jsonify(error="Login required"), 401
+    data = request.get_json(force=True, silent=True) or {}
+    bot_id = data.get("bot_id")
+    if not bot_id:
+        return jsonify(error="bot_id required"), 400
+    bot = store.get_bot(current_app, bot_id, user["id"])
+    if not bot:
+        return jsonify(error="Bot not found"), 404
+    store.update_bot(current_app, bot_id, user["id"], flow={"flow_id": flow_id})
+    return jsonify(ok=True)
+
+
+@bp.route("/api/flow-sessions/<int:session_id>/advance", methods=["POST"])
+def api_advance_flow_session(session_id):
+    user = current_user(current_app)
+    if not user:
+        return jsonify(error="Login required"), 401
+    session = store.get_flow_session(current_app, session_id)
+    if not session or session["user_id"] != user["id"]:
+        return jsonify(error="Session not found"), 404
+    data = request.get_json(force=True, silent=True) or {}
+    message = data.get("message", "")
+    from .flow_engine import FlowEngine
+    engine = FlowEngine(current_app)
+    result = engine.advance(session_id, message)
+    if "error" in result:
+        return jsonify(error=result["error"]), 400
+    # Persist assistant response as a message if there's a conversation
+    conv_id = session.get("conversation_id")
+    if conv_id and result.get("response"):
+        bot = store.get_bot(current_app, session["bot_id"])
+        store.add_message(current_app, conv_id, "assistant", result["response"],
+                          citations=result.get("citations"))
+    return jsonify(result)
+
+
 # __API3__

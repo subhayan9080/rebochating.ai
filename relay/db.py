@@ -110,6 +110,55 @@ CREATE TABLE IF NOT EXISTS webhooks(
   active INTEGER DEFAULT 1,
   created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS flows(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  version INTEGER DEFAULT 1,
+  is_published INTEGER DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS flow_nodes(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  flow_id INTEGER NOT NULL REFERENCES flows(id) ON DELETE CASCADE,
+  node_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  config TEXT DEFAULT '{}',
+  position_x REAL DEFAULT 0,
+  position_y REAL DEFAULT 0,
+  next_nodes TEXT DEFAULT '[]',
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS flow_versions(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  flow_id INTEGER NOT NULL REFERENCES flows(id) ON DELETE CASCADE,
+  version INTEGER NOT NULL,
+  definition TEXT NOT NULL,
+  is_published INTEGER DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS flow_sessions(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  flow_id INTEGER NOT NULL REFERENCES flows(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  bot_id INTEGER NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+  conversation_id INTEGER REFERENCES conversations(id),
+  variables TEXT DEFAULT '{}',
+  current_node_id TEXT DEFAULT '',
+  status TEXT DEFAULT 'active',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS intents(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  bot_id INTEGER NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  phrases TEXT DEFAULT '[]',
+  responses TEXT DEFAULT '[]',
+  created_at INTEGER NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_bots_user ON bots(user_id);
 CREATE INDEX IF NOT EXISTS idx_sources_bot ON sources(bot_id);
 CREATE INDEX IF NOT EXISTS idx_chunks_bot ON chunks(bot_id);
@@ -117,6 +166,10 @@ CREATE INDEX IF NOT EXISTS idx_chunks_source ON chunks(source_id);
 CREATE INDEX IF NOT EXISTS idx_conv_bot ON conversations(bot_id);
 CREATE INDEX IF NOT EXISTS idx_msg_conv ON messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_contacts_bot ON contacts(bot_id);
+CREATE INDEX IF NOT EXISTS idx_flow_nodes_flow ON flow_nodes(flow_id);
+CREATE INDEX IF NOT EXISTS idx_flow_versions_flow_ver ON flow_versions(flow_id, version);
+CREATE INDEX IF NOT EXISTS idx_flow_sessions_conv ON flow_sessions(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_intents_bot ON intents(bot_id);
 """
 
 

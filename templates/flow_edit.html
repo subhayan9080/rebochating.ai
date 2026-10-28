@@ -1,0 +1,170 @@
+{% extends "layout.html" %}
+{% block title %}Flow Builder · {{ flow.name }} · Relay{% endblock %}
+{% block page_title %}Flow Builder{% endblock %}
+{% block body %}
+<header class="settings-header">
+  <h2>Flow Builder</h2>
+  <p class="muted small">{{ flow.name }} · {{ flow.description }}</p>
+</header>
+
+<div class="row mb">
+  <a href="{{ url_for('dash.flows') }}" class="btn">← Back to Flows</a>
+  <span class="sp"></span>
+  {% if flow.is_published %}
+  <span class="badge ok">Published v{{ flow.version }}</span>
+  {% else %}
+  <span class="badge warn">Draft</span>
+  {% endif %}
+  <form action="{{ url_for('dash.flow_publish', flow_id=flow.id) }}" method="post" style="display:inline">
+    <button class="btn btn-primary">Publish Flow</button>
+  </form>
+</div>
+
+<div class="shell" style="height:70vh">
+  <aside class="sidebar" style="width:260px">
+    <div class="nav-cap">Node Palette</div>
+    <div class="palette">
+      <div class="palette-item" data-type="text" onclick="addNode('text')">
+        <svg class="ico"><use href="#i-chat"/></svg><span>Text Message</span>
+      </div>
+      <div class="palette-item" data-type="choice" onclick="addNode('choice')">
+        <svg class="ico"><use href="#i-users"/></svg><span>Choice / Options</span>
+      </div>
+      <div class="palette-item" data-type="llm" onclick="addNode('llm')">
+        <svg class="ico"><use href="#i-bot"/></svg><span>AI Answer (LLM)</span>
+      </div>
+      <div class="palette-item" data-type="condition" onclick="addNode('condition')">
+        <svg class="ico"><use href="#i-search"/></svg><span>Condition / Branch</span>
+      </div>
+      <div class="palette-item" data-type="capture" onclick="addNode('capture')">
+        <svg class="ico"><use href="#i-dot"/></svg><span>Capture Input</span>
+      </div>
+      <div class="palette-item" data-type="variable_set" onclick="addNode('variable_set')">
+        <svg class="ico"><use href="#i-gear"/></svg><span>Set Variable</span>
+      </div>
+      <div class="palette-item" data-type="api_call" onclick="addNode('api_call')">
+        <svg class="ico"><use href="#i-send"/></svg><span>API Call</span>
+      </div>
+      <div class="palette-item" data-type="handoff" onclick="addNode('handoff')">
+        <svg class="ico"><use href="#i-inbox"/></svg><span>Human Handoff</span>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main" style="flex:1; min-width:0; position:relative">
+    <div class="canvas" id="canvas" style="position:relative; height:100%; background:#0b0e14; cursor:grab;"></div>
+  </div>
+
+  <div id="props-panel" style="display:none; position:absolute; top:0; right:0; width:340px; height:100%; background:#11151d; border-left:1px solid var(--line); z-index:10; padding:16px; overflow-y:auto">
+    <h3 style="margin-top:0">Node Properties</h3>
+    <div id="props-content"></div>
+    <div class="mt">
+      <button class="btn btn-danger" onclick="deleteSelectedNode()">Delete Node</button>
+      <button class="btn" onclick="document.getElementById('props-panel').style.display='none'">Close</button>
+    </div>
+  </div>
+</div>
+<script>
+const flowId = {{ flow.id }};
+const nodes = JSON.parse('{{ nodes | tojson | safe }}');
+let selectedNodeId = null;
+
+function render() {
+  const canvas = document.getElementById('canvas');
+  canvas.innerHTML = '';
+  nodes.forEach(n => {
+    const el = document.createElement('div');
+    el.className = 'flow-node ' + (selectedNodeId === n.node_id ? 'selected' : '');
+    el.style.left = (n.position_x || 0) + 'px';
+    el.style.top = (n.position_y || 0) + 'px';
+    el.dataset.nodeId = n.node_id;
+    el.innerHTML = '<div class="flow-node-header"><span class="flow-node-type">' + n.type + '</span><span class="flow-node-id">' + n.node_id + '</span></div><div class="flow-node-body">' + nodeConfigHtml(n) + '</div><div class="flow-node-port port-output" onclick="startConnection(\'' + n.node_id + '\')">&#9679;</div>';
+    el.onmousedown = function(e) { selectedNodeId = n.node_id; render(); showProps(n); e.stopPropagation(); };
+    el.ondblclick = function() { selectedNodeId = n.node_id; render(); showProps(n); };
+    canvas.appendChild(el);
+  });
+  renderConnections();
+}
+function nodeConfigHtml(n) {
+  const c = n.config || {};
+  switch(n.type) {
+    case 'text': return '<div class="field"><label>Message</label><textarea onchange="updateNode(\'' + n.node_id + '\',\'config.message\',this.value)">' + (c.message||'') + '</textarea></div>';
+    case 'choice': return '<div class="field"><label>Options (JSON)</label><textarea onchange="updateNode(\'' + n.node_id + '\',\'config.options\',this.value)" rows="3">' + JSON.stringify(c.options||[]) + '</textarea></div>';
+    case 'llm': return '<div class="field"><label>Prompt</label><textarea onchange="updateNode(\'' + n.node_id + '\',\'config.prompt\',this.value)">' + (c.prompt||'') + '</textarea></div><div class="field"><label>Model</label><input onchange="updateNode(\'' + n.node_id + '\',\'config.model_override\',this.value)" value="' + (c.model_override||'') + '"></div>';
+    case 'condition': return '<div class="field"><label>Rules (JSON)</label><textarea onchange="updateNode(\'' + n.node_id + '\',\'config.rules\',this.value)" rows="3">' + JSON.stringify(c.rules||[]) + '</textarea></div>';
+    case 'capture': return '<div class="field"><label>Variable Name</label><input onchange="updateNode(\'' + n.node_id + '\',\'config.variable_name\',this.value)" value="' + (c.variable_name||'') + '"></div><div class="field"><label>Prompt</label><input onchange="updateNode(\'' + n.node_id + '\',\'config.prompt\',this.value)" value="' + (c.prompt||'') + '"></div><div class="field"><label>Validation</label><select onchange="updateNode(\'' + n.node_id + '\',\'config.validation\',this.value)"><option value="">None</option><option value="email" ' + (c.validation==='email'?'selected':'') + '>Email</option><option value="number" ' + (c.validation==='number'?'selected':'') + '>Number</option><option value="url" ' + (c.validation==='url'?'selected':'') + '>URL</option></select></div>';
+    case 'variable_set': return '<div class="field"><label>Variables (JSON)</label><textarea onchange="updateNode(\'' + n.node_id + '\',\'config.variables\',this.value)" rows="3">' + JSON.stringify(c.variables||{}) + '</textarea></div>';
+    case 'api_call': return '<div class="field"><label>URL</label><input onchange="updateNode(\'' + n.node_id + '\',\'config.url\',this.value)" value="' + (c.url||'') + '"></div><div class="field"><label>Response Var</label><input onchange="updateNode(\'' + n.node_id + '\',\'config.response_var\',this.value)" value="' + (c.response_var||'') + '"></div>';
+    case 'handoff': return '<div class="field"><label>Message</label><input onchange="updateNode(\'' + n.node_id + '\',\'config.message\',this.value)" value="' + (c.message||'') + '"></div><div class="field"><label>Reason</label><input onchange="updateNode(\'' + n.node_id + '\',\'config.reason\',this.value)" value="' + (c.reason||'') + '"></div>';
+    default: return '<div class="faint small">No configuration available.</div>';
+  }
+}
+
+function updateNode(nodeId, keyPath, value) {
+  const n = nodes.find(x => x.node_id === nodeId);
+  if (!n) return;
+  if (!n.config) n.config = {};
+  const parts = keyPath.split('.');
+  let obj = n.config;
+  for (let i = 0; i < parts.length - 1; i++) obj = obj[parts[i]] || (obj[parts[i]] = {});
+  obj[parts[parts.length - 1]] = value;
+  fetch('/api/flows/' + flowId, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({nodes: nodes})}).then(r => r.json()).then(() => render());
+}
+
+function addNode(type) {
+  const nodeId = 'n' + Date.now();
+  const node = {id: nodeId, node_id: nodeId, type: type, x: 100, y: 100, config: {}, next: []};
+  nodes.push(node);
+  fetch('/api/flows/' + flowId, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({nodes: nodes})}).then(() => render());
+}
+
+function deleteSelectedNode() {
+  if (!selectedNodeId) return;
+  nodes = nodes.filter(n => n.node_id !== selectedNodeId);
+  selectedNodeId = null;
+  document.getElementById('props-panel').style.display = 'none';
+  fetch('/api/flows/' + flowId, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({nodes: nodes})}).then(() => render());
+}
+
+function showProps(n) {
+  document.getElementById('props-panel').style.display = 'block';
+  document.getElementById('props-content').innerHTML = nodeConfigHtml(n);
+}
+
+function startConnection(fromNodeId) {
+  const n = nodes.find(x => x.node_id === fromNodeId);
+  if (!n) return;
+  const target = prompt('Enter target node_id:');
+  if (target === null) return;
+  n.next = target ? [target] : [];
+  n.next_nodes = target ? [target] : [];
+  fetch('/api/flows/' + flowId, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({nodes: nodes})}).then(() => render());
+}
+
+function renderConnections() {
+  const canvas = document.getElementById('canvas');
+  nodes.forEach(n => {
+    (n.next_nodes || []).forEach(function(targetId) {
+      const target = nodes.find(x => x.node_id === targetId);
+      if (!target) return;
+      const rect1 = document.querySelector('[data-node-id="' + n.node_id + '"]');
+      const rect2 = document.querySelector('[data-node-id="' + target.node_id + '"]');
+      if (!rect1 || !rect2) return;
+      const x1 = rect1.offsetLeft + rect1.offsetWidth;
+      const y1 = rect1.offsetTop + rect1.offsetHeight / 2;
+      const x2 = rect2.offsetLeft;
+      const y2 = rect2.offsetTop + rect2.offsetHeight / 2;
+      const el = document.createElement('div');
+      el.className = 'flow-connection';
+      el.style.left = x1 + 'px';
+      el.style.top = y1 + 'px';
+      el.style.width = Math.max(0, x2 - x1) + 'px';
+      el.style.borderTop = '1px solid var(--brand2)';
+      canvas.appendChild(el);
+    });
+  });
+}
+
+render();
+</script>
+{% endblock %}

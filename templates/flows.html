@@ -1,0 +1,51 @@
+{% extends "layout.html" %}
+{% block title %}Flows · Relay{% endblock %}
+{% block page_title %}Flows{% endblock %}
+{% block body %}
+<header class="settings-header">
+  <h2>Flows</h2>
+  <p class="muted small">Design conversation flows with a visual builder. Publish a flow and assign it to a chatbot to power automated conversations.</p>
+</header>
+
+<div class="row mb">
+  <a href="#" class="btn btn-primary" onclick="document.getElementById('new-flow-form').submit()">+ New Flow</a>
+  <form id="new-flow-form" action="{{ url_for('dash.flow_new') }}" method="post" style="display:none">
+    <input type="text" name="name" placeholder="Flow name">
+  </form>
+  <a href="{{ url_for('dash.settings') }}" class="btn">← Back to Settings</a>
+</div>
+
+{% if flows %}
+<div class="grid g3">
+  {% for f in flows %}
+  <div class="card">
+    <div class="card-head">
+      <h3>{{ f.name }}</h3>
+      <span class="badge {% if f.is_published %}ok{% else %}warn{% endif %}">
+        {% if f.is_published %}Published v{{ f.version }}{% else %}Draft{% endif %}
+      </span>
+    </div>
+    <p class="muted small">{{ f.description }}</p>
+    <p class="faint small">Nodes: {{ f.node_count }} · Updated: {{ f.updated_at | ts }}</p>
+    <div class="row mt">
+      <a href="{{ url_for('dash.flow_edit', flow_id=f.id) }}" class="btn btn-sm">Edit</a>
+      {% if not f.is_published %}
+      <form action="{{ url_for('dash.flow_publish', flow_id=f.id) }}" method="post" style="display:inline">
+        <button class="btn btn-sm btn-primary">Publish</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty">
+  <div class="big">🎯</div>
+  <p>No flows yet. Create your first flow to design automated conversations.</p>
+  <form action="{{ url_for('dash.flow_new') }}" method="post" style="margin-top:16px">
+    <input type="text" name="name" placeholder="Flow name" required>
+    <button class="btn btn-primary" type="submit">Create Flow</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

@@ -335,3 +335,60 @@ a{color:var(--brand)}
 .help{color:var(--faint);font-size:11px;margin:4px 0 0;line-height:1.4}
 
 .settings-header + .grid{margin-top:0}
+
+/* Flow builder styles */
+.flow-node {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 12px;
+  width: 200px;
+  position: absolute;
+  cursor: grab;
+  font-size: 13px;
+  color: var(--text);
+  box-shadow: 0 2px 8px rgba(0,0,0,.3);
+}
+.flow-node.selected {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(99,102,241,.2);
+}
+.flow-node-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.flow-node-type { font-weight: 600; color: var(--brand2); }
+.flow-node-id { font-family: monospace; opacity: 0.7; font-size: 10px; }
+.flow-node-body .field { margin-bottom: 8px; }
+.flow-node-body label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; font-weight: 600; }
+.flow-node-body input, .flow-node-body textarea, .flow-node-body select {
+  width: 100%; background: #0d1219; border: 1px solid var(--line); color: var(--text);
+  border-radius: 7px; padding: 6px 8px; font-size: 12px; font-family: inherit;
+}
+.flow-node-body textarea { resize: vertical; height: 60px; }
+.flow-node-port {
+  position: absolute; top: 10px; right: -8px; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--brand2); border: 2px solid var(--panel2);
+  cursor: pointer; font-size: 10px; line-height: 16px; text-align: center; color: #fff;
+}
+.flow-connection {
+  position: absolute; height: 0; z-index: 1; pointer-events: none;
+  border-top: 1px solid var(--brand2); border-color: var(--brand2);
+}
+.palette { padding: 0 14px 14px; }
+.palette-item {
+  display: flex; align-items: center; gap: 10px; padding: 10px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 9px;
+  color: var(--text); cursor: grab; margin-bottom: 8px; font-size: 13px;
+}
+.palette-item:hover { background: var(--panel2); border-color: var(--brand); color: #fff; }
+.palette-item .ico { width: 16px; height: 16px; color: var(--muted); }
+.palette-item:hover .ico { color: var(--brand2); }
+.flow-node-body { padding: 0 8px; }
+.flow-node-port { cursor: pointer; }
+.flow-node-header { cursor: move; }

@@ -576,3 +576,51 @@ def health():
 def share(slug):
     # Short share link -> canonical public chat page.
     return redirect(f"/chat/{slug}")
+
+
+# ------------------------------------------------------ flows
+
+@bp.route("/flows")
+@login_required
+def flows():
+    app, user, bots = ctx()
+    flow_list = store.list_flows(app, user["id"])
+    return render_template("flows.html", user=user, bots=bots, bot=active_bot(app, user, bots),
+                           flows=flow_list)
+
+
+@bp.route("/flows/new", methods=["POST"])
+@login_required
+def flow_new():
+    app, user, _ = ctx()
+    name = request.form.get("name", "").strip() or "New Flow"
+    description = request.form.get("description", "").strip()
+    fid = store.create_flow(app, user["id"], name, description)
+    flash(f"Flow “{name}” created. Add nodes in the builder.", "ok")
+    return redirect(url_for("dash.flow_edit", flow_id=fid))
+
+
+@bp.route("/flows/<int:flow_id>/edit")
+@login_required
+def flow_edit(flow_id):
+    app, user, bots = ctx()
+    flow = store.get_flow(app, flow_id, user["id"])
+    if not flow:
+        flash("Flow not found.", "error")
+        return redirect(url_for("dash.flows"))
+    nodes = store.get_flow_nodes(app, flow_id)
+    return render_template("flow_edit.html", user=user, bots=bots,
+                           bot=active_bot(app, user, bots),
+                           flow=flow, nodes=nodes)
+
+
+@bp.route("/flows/<int:flow_id>/publish", methods=["POST"])
+@login_required
+def flow_publish(flow_id):
+    app, user, _ = ctx()
+    ver = store.publish_flow(app, flow_id, user["id"])
+    if not ver:
+        flash("Flow not found.", "error")
+        return redirect(url_for("dash.flows"))
+    flash(f"Flow published (version {ver}).", "ok")
+    return redirect(url_for("dash.flow_edit", flow_id=flow_id))

@@ -1,6 +1,8 @@
 """Shared chat answering: retrieve -> LLM/offline -> persist."""
 from __future__ import annotations
 
+import json
+
 from . import rag, store
 
 
@@ -79,6 +81,36 @@ def bot_system_prompt(bot, user) -> str:
 
 def answer_turn(app, bot, user, history: list[dict], query: str, conv_id: int | None = None) -> dict:
     """history: prior [{role, content}] (without the new query). Returns reply dict."""
+    # ---- Voiceflow-like flow engine: route through flow if bot has one ----
+    flow_ref = bot.get("flow") or ""
+    flow_id = None
+    try:
+        flow_ref_parsed = json.loads(flow_ref) if isinstance(flow_ref, str) else flow_ref
+        if isinstance(flow_ref_parsed, dict):
+            flow_id = flow_ref_parsed.get("flow_id")
+        elif isinstance(flow_ref_parsed, str) and flow_ref_parsed:
+            flow_id = flow_ref_parsed
+    except (ValueError, TypeError):
+        flow_id = flow_ref if flow_ref else None
+
+    if flow_id:
+        from .flow_engine import FlowEngine
+        flow_engine = FlowEngine(app)
+        session = flow_engine.get_session_by_conversation(conv_id) if conv_id else None
+        if not session:
+            session = flow_engine.start_session(flow_id, user["id"], bot["id"], conv_id)
+        result = flow_engine.advance(session["id"], query)
+        if result.get("response"):
+            store.add_message(app, conv_id, "assistant", result["response"],
+                              citations=result.get("citations"))
+            if not store.get_conversation(app, conv_id).get("title"):
+                store.set_conversation(app, conv_id, user["id"], title=query[:60])
+            return {"text": result["response"], "citations": result.get("citations") or [],
+                    "provider": result.get("provider", "flow"),
+                    "model": result.get("model", "flow"),
+                    "guardrail": None, "guardrail_reason": None}
+        # Flow is waiting for input or produced no response; fall through to RAG
+
     index = rag.load_bot_index(app, bot["id"])
     hits = rag.bm25_search(index, query, k=4)
     provider, key, model = rag.resolve_provider(app, user)

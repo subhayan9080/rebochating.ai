@@ -633,3 +633,224 @@ def rate_message_public(app, message_id, conv_id, rating):
         return cur.rowcount > 0
     finally:
         conn.close()
+
+
+# ================================================================ flows
+
+def create_flow(app, user_id, name, description=""):
+    return _write(app,
+        "INSERT INTO flows(user_id, name, description, version, is_published, created_at, updated_at)"
+        " VALUES(?,?,?,?,?,?,?)",
+        (user_id, name.strip(), description.strip(), 1, 0, now(), now()))
+
+
+def get_flow(app, flow_id, user_id=None):
+    if user_id is None:
+        return _one(app, "SELECT * FROM flows WHERE id=?", (flow_id,))
+    return _one(app, "SELECT * FROM flows WHERE id=? AND user_id=?", (flow_id, user_id))
+
+
+def list_flows(app, user_id, include_unpublished=True):
+    if include_unpublished:
+        return _all(app,
+            "SELECT f.*, COUNT(fn.id) AS node_count FROM flows f"
+            " LEFT JOIN flow_nodes fn ON fn.flow_id=f.id"
+            " WHERE f.user_id=? GROUP BY f.id ORDER BY f.updated_at DESC",
+            (user_id,))
+    return _all(app,
+        "SELECT f.*, COUNT(fn.id) AS node_count FROM flows f"
+        " LEFT JOIN flow_nodes fn ON fn.flow_id=f.id"
+        " WHERE f.user_id=? AND f.is_published=1 GROUP BY f.id ORDER BY f.updated_at DESC",
+        (user_id,))
+
+
+def update_flow(app, flow_id, user_id, **fields):
+    allowed = {"name", "description"}
+    sets = [f"{k}=?" for k in fields if k in allowed]
+    if not sets:
+        return
+    vals = [fields[k] for k in fields if k in allowed]
+    sets.append("updated_at=?")
+    vals.append(now())
+    _exec(app, f"UPDATE flows SET {', '.join(sets)} WHERE id=? AND user_id=?",
+          (*vals, flow_id, user_id))
+
+
+def delete_flow(app, flow_id, user_id):
+    _exec(app, "DELETE FROM flows WHERE id=? AND user_id=?", (flow_id, user_id))
+
+
+def publish_flow(app, flow_id, user_id):
+    flow = get_flow(app, flow_id, user_id)
+    if not flow:
+        return None
+    nodes = get_flow_nodes(app, flow_id)
+    definition = {"nodes": nodes}
+    new_ver = flow["version"] + 1
+    _write(app,
+        "INSERT INTO flow_versions(flow_id, version, definition, is_published, created_at)"
+        " VALUES(?,?,?,?,?)",
+        (flow_id, new_ver, json.dumps(definition), 1, now()))
+    _exec(app, "UPDATE flow_versions SET is_published=0 WHERE flow_id=? AND version != ?",
+          (flow_id, new_ver))
+    _exec(app, "UPDATE flows SET version=?, is_published=1, updated_at=? WHERE id=? AND user_id=?",
+          (new_ver, now(), flow_id, user_id))
+    return new_ver
+
+
+def get_published_flow(app, flow_id):
+    ver = _one(app,
+        "SELECT * FROM flow_versions WHERE flow_id=? AND is_published=1 ORDER BY version DESC LIMIT 1",
+        (flow_id,))
+    if not ver:
+        return None
+    return json.loads(ver["definition"] or "{}")
+
+# ================================================================ flow nodes
+
+def create_flow_node(app, flow_id, node_id, node_type, config, position_x=0, position_y=0, next_nodes=None):
+    return _write(app,
+        "INSERT INTO flow_nodes(flow_id, node_id, type, config, position_x, position_y, next_nodes, created_at)"
+        " VALUES(?,?,?,?,?,?,?,?)",
+        (flow_id, node_id, node_type,
+         config if isinstance(config, str) else json.dumps(config),
+         position_x, position_y,
+         json.dumps(next_nodes or []), now()))
+
+
+def get_flow_nodes(app, flow_id):
+    rows = _all(app,
+        "SELECT * FROM flow_nodes WHERE flow_id=? ORDER BY created_at", (flow_id,))
+    for r in rows:
+        if isinstance(r.get("config"), str):
+            try:
+                r["config"] = json.loads(r["config"] or "{}")
+            except (ValueError, TypeError):
+                r["config"] = {}
+        if isinstance(r.get("next_nodes"), str):
+            try:
+                r["next_nodes"] = json.loads(r["next_nodes"] or "[]")
+            except (ValueError, TypeError):
+                r["next_nodes"] = []
+    return rows
+
+
+def update_flow_node(app, node_id, **fields):
+    allowed = {"type", "config", "position_x", "position_y", "next_nodes"}
+    sets, vals = [], []
+    for k, v in fields.items():
+        if k not in allowed:
+            continue
+        if k in ("config", "next_nodes"):
+            v = v if isinstance(v, str) else json.dumps(v)
+        sets.append(f"{k}=?")
+        vals.append(v)
+    if not sets:
+        return
+    _exec(app, f"UPDATE flow_nodes SET {', '.join(sets)} WHERE node_id=?", (*vals, node_id))
+
+
+def delete_flow_node(app, node_id):
+    _exec(app, "DELETE FROM flow_nodes WHERE node_id=?", (node_id,))
+
+
+def replace_flow_nodes(app, flow_id, nodes):
+    conn = connect(app.config["DB_PATH"])
+    try:
+        conn.execute("DELETE FROM flow_nodes WHERE flow_id=?", (flow_id,))
+        for n in nodes:
+            conn.execute(
+                "INSERT INTO flow_nodes(flow_id, node_id, type, config, position_x, position_y, next_nodes, created_at)"
+                " VALUES(?,?,?,?,?,?,?,?)",
+                (flow_id, n["id"], n["type"],
+                 json.dumps(n.get("config", {})),
+                 n.get("x", 0), n.get("y", 0),
+                 json.dumps(n.get("next", [])), now()))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+# ================================================================ flow sessions
+
+def create_flow_session(app, flow_id, user_id, bot_id, conversation_id=None):
+    return _write(app,
+        "INSERT INTO flow_sessions(flow_id, user_id, bot_id, conversation_id, variables, current_node_id, status, created_at, updated_at)"
+        " VALUES(?,?,?,?,?,?,?,?,?)",
+        (flow_id, user_id, bot_id, conversation_id, "{}", "", "active", now(), now()))
+
+
+def get_flow_session(app, session_id):
+    return _one(app, "SELECT * FROM flow_sessions WHERE id=?", (session_id,))
+
+
+def get_flow_session_by_conversation(app, conversation_id):
+    return _one(app,
+        "SELECT * FROM flow_sessions WHERE conversation_id=? AND status='active'"
+        " ORDER BY updated_at DESC LIMIT 1", (conversation_id,))
+
+
+def update_flow_session(app, session_id, **fields):
+    allowed = {"variables", "current_node_id", "status"}
+    sets = [f"{k}=?" for k in fields if k in allowed]
+    if not sets:
+        return
+    vals = []
+    for k in fields:
+        if k in allowed:
+            v = fields[k]
+            if k in ("variables",):
+                v = v if isinstance(v, str) else json.dumps(v)
+            vals.append(v)
+    sets.append("updated_at=?")
+    vals.append(now())
+    _exec(app, f"UPDATE flow_sessions SET {', '.join(sets)} WHERE id=?", (*vals, session_id))
+
+
+# ================================================================ intents
+
+def create_intent(app, bot_id, name, phrases, responses):
+    return _write(app,
+        "INSERT INTO intents(bot_id, name, phrases, responses, created_at)"
+        " VALUES(?,?,?,?,?)",
+        (bot_id, name,
+         json.dumps(phrases if isinstance(phrases, list) else [phrases]),
+         json.dumps(responses if isinstance(responses, list) else [responses]),
+         now()))
+
+
+def list_intents(app, bot_id):
+    rows = _all(app, "SELECT * FROM intents WHERE bot_id=? ORDER BY created_at", (bot_id,))
+    for r in rows:
+        for k in ("phrases", "responses"):
+            if isinstance(r.get(k), str):
+                try:
+                    r[k] = json.loads(r[k] or "[]")
+                except (ValueError, TypeError):
+                    r[k] = []
+    return rows
+
+
+def match_intent(app, bot_id, query):
+    import re
+    intents = list_intents(app, bot_id)
+    if not intents:
+        return None
+    q_tokens = set(t for t in re.sub(r"[^a-z0-9 ]", " ", query.lower()).split() if len(t) > 1)
+    best = None
+    best_score = 0.0
+    for intent in intents:
+        phrases = intent.get("phrases") or []
+        matched = 0
+        for phrase in phrases:
+            p_tokens = set(t for t in re.sub(r"[^a-z0-9 ]", " ", phrase.lower()).split() if len(t) > 1)
+            if p_tokens and p_tokens & q_tokens:
+                matched += 1
+        score = matched / len(phrases) if phrases else 0.0
+        if score > best_score:
+            best_score = score
+            best = intent
+    if best and best_score >= 0.3:
+        best["confidence"] = best_score
+        return best
+    return None
