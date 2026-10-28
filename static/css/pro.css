@@ -322,3 +322,16 @@ a{color:var(--brand)}
 [data-theme="dark"] .theme-choice{background:var(--panel2);border-color:var(--line)}
 [data-theme="dark"] .theme-choice:hover{border-color:#3b4a6b;color:var(--text)}
 [data-theme="dark"] .theme-choice.on{background:rgba(129,140,248,.14);border-color:var(--brand);color:#c7d2fe;box-shadow:0 0 0 3px rgba(129,140,248,.18)}
+
+/* Settings page enhancements */
+.settings-header{margin-bottom:24px}
+.settings-header h2{font-size:22px;font-weight:700;letter-spacing:-.02em;margin:0 0 6px}
+.settings-header p{margin:0}
+
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.card-head h3{font-size:15px;margin:0}
+.card-head .badge{font-size:11px}
+
+.help{color:var(--faint);font-size:11px;margin:4px 0 0;line-height:1.4}
+
+.settings-header + .grid{margin-top:0}

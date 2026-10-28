@@ -1,52 +1,107 @@
 {% extends "layout.html" %}
-{% block title %}Settings{% endblock %}
+{% block title %}Settings · Relay{% endblock %}
 {% block page_title %}Settings{% endblock %}
 {% block body %}
+<header class="settings-header">
+  <h2>Settings</h2>
+  <p class="muted small">Manage your workspace, AI provider, and appearance preferences.</p>
+</header>
+
 <div class="grid g2">
   <div class="card">
-    <h3>Workspace</h3>
+    <div class="card-head">
+      <h3>Workspace</h3>
+      <span class="badge brand">Profile</span>
+    </div>
     <form method="post">
       <input type="hidden" name="form" value="profile">
-      <div class="field"><label>Your name</label><input type="text" name="name" value="{{ user.name }}"></div>
-      <div class="field"><label>Workspace name</label><input type="text" name="workspace" value="{{ user.workspace }}"></div>
-      <div class="field"><label>Email</label><input type="text" value="{{ user.email }}" disabled></div>
-      <button class="btn btn-primary" type="submit">Save</button>
+      <div class="field">
+        <label>Your name</label>
+        <input type="text" name="name" value="{{ user.name }}" placeholder="Enter your name">
+        <p class="help">Used across the dashboard and in chat signatures.</p>
+      </div>
+      <div class="field">
+        <label>Workspace name</label>
+        <input type="text" name="workspace" value="{{ user.workspace }}" placeholder="Your workspace">
+        <p class="help">Shown in the sidebar and public chat pages.</p>
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" value="{{ user.email }}" disabled>
+        <p class="help">Email cannot be changed from settings.</p>
+      </div>
+      <button class="btn btn-primary" type="submit">Save workspace settings</button>
     </form>
   </div>
+
   <div class="card">
-    <h3>AI provider</h3>
-    <p class="muted small">Current: {% if provider=='offline' %}<span class="badge warn">offline retrieval</span>{% else %}<span class="badge ok">{{ provider }} · {{ model }}</span>{% endif %}</p>
+    <div class="card-head">
+      <h3>AI Provider</h3>
+      <span class="badge {% if provider=='offline' %}warn{% else %}ok{% endif %}">
+        {% if provider=='offline' %}Offline retrieval{% else %}{{ provider }} · {{ model }}{% endif %}
+      </span>
+    </div>
     <form method="post">
       <input type="hidden" name="form" value="ai">
-      <div class="field"><label>Provider</label>
+      <div class="field">
+        <label>Provider</label>
         <select name="ai_provider">
-          <option value="auto" {% if user.ai_provider=='auto' %}selected{% endif %}>Auto-detect from key</option>
+          <option value="auto" {% if user.ai_provider=='auto' %}selected{% endif %}>Auto-detect from API key</option>
           <option value="openai" {% if user.ai_provider=='openai' %}selected{% endif %}>OpenAI</option>
           <option value="anthropic" {% if user.ai_provider=='anthropic' %}selected{% endif %}>Anthropic</option>
           <option value="offline" {% if user.ai_provider=='offline' %}selected{% endif %}>Offline retrieval only</option>
-        </select></div>
-      <div class="field"><label>API key {% if masked %}(saved: {{ masked }}){% endif %}</label>
-        <input type="password" name="ai_api_key" placeholder="{% if masked %}Leave blank to keep saved key{% else %}sk-... / sk-ant-...{% endif %}" autocomplete="off"></div>
-      <div class="field"><label>Model (optional)</label><input type="text" name="ai_model" value="{{ user.ai_model }}" placeholder="gpt-4o-mini / claude-3-5-haiku-latest"></div>
+        </select>
+        <p class="help">Choose which AI provider handles your chatbot responses.</p>
+      </div>
+      <div class="field">
+        <label>API key {% if masked %}(saved: {{ masked }}){% endif %}</label>
+        <input type="password" name="ai_api_key" placeholder="{% if masked %}Leave blank to keep saved key{% else %}sk-... / sk-ant-...{% endif %}" autocomplete="off">
+        <p class="help">Stored securely and used only for your workspace.</p>
+      </div>
+      <div class="field">
+        <label>Model (optional)</label>
+        <input type="text" name="ai_model" value="{{ user.ai_model }}" placeholder="gpt-4o-mini / claude-3-5-haiku-latest">
+        <p class="help">Leave empty to use the provider's default model.</p>
+      </div>
       <button class="btn btn-primary" type="submit">Save AI settings</button>
     </form>
   </div>
+
   <div class="card">
-    <h3>Appearance</h3>
+    <div class="card-head">
+      <h3>Appearance</h3>
+      <span class="badge">{{ (user.theme or 'light')|capitalize }} mode</span>
+    </div>
     <p class="muted small">Choose how Relay looks. "System" follows your device's light/dark setting.</p>
     <div class="theme-choices">
       {% set cur = user.theme or 'light' %}
-      <button type="button" class="theme-choice {% if cur=='light' %}on{% endif %}" data-theme-choice="light">
+      <button type="button" class="theme-choice {% if cur=='light' %}on{% endif %}" data-theme-choice="light" onclick="selectTheme(this, 'light')">
         <svg class="ico"><use href="#i-sun"/></svg><span>Light</span>
       </button>
-      <button type="button" class="theme-choice {% if cur=='dark' %}on{% endif %}" data-theme-choice="dark">
+      <button type="button" class="theme-choice {% if cur=='dark' %}on{% endif %}" data-theme-choice="dark" onclick="selectTheme(this, 'dark')">
         <svg class="ico"><use href="#i-moon"/></svg><span>Dark</span>
       </button>
-      <button type="button" class="theme-choice {% if cur=='system' %}on{% endif %}" data-theme-choice="system">
+      <button type="button" class="theme-choice {% if cur=='system' %}on{% endif %}" data-theme-choice="system" onclick="selectTheme(this, 'system')">
         <svg class="ico"><use href="#i-monitor"/></svg><span>System</span>
       </button>
     </div>
     <p class="faint small mt">Saved automatically. You can also toggle instantly from the ☀ / ☾ button in the top bar.</p>
   </div>
 </div>
+
+<script>
+function selectTheme(btn, theme) {
+  document.querySelectorAll('.theme-choice').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  fetch('/settings/theme', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({theme: theme})
+  }).then(r => r.json()).then(data => {
+    if (data.ok) {
+      document.documentElement.setAttribute('data-theme', data.theme);
+    }
+  });
+}
+</script>
 {% endblock %}
