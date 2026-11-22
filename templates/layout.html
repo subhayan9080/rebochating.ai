@@ -61,8 +61,10 @@
     <div class="nav-cap">Build</div>
     <a href="{{ url_for('dash.overview') }}" class="{% if request.endpoint=='dash.overview' %}on{% endif %}"><svg class="ico"><use href="#i-grid"/></svg> Overview</a>
     <a href="{{ url_for('dash.chatbots') }}" class="{% if request.endpoint in ('dash.chatbots','dash.chatbot_edit') %}on{% endif %}"><svg class="ico"><use href="#i-bot"/></svg> AI agents</a>
+    <a href="{{ url_for('dash.flows') }}" class="{% if request.endpoint=='dash.flows' %}on{% endif %}"><svg class="ico"><use href="#i-book"/></svg> Flows</a>
     <a href="{{ url_for('dash.sources') }}" class="{% if request.endpoint=='dash.sources' %}on{% endif %}"><svg class="ico"><use href="#i-book"/></svg> Data sources</a>
     <a href="{{ url_for('dash.playground') }}" class="{% if request.endpoint=='dash.playground' %}on{% endif %}"><svg class="ico"><use href="#i-chat"/></svg> Playground</a>
+<a href="{{ url_for('dash.flows') }}" class="{% if request.endpoint=='dash.flows' %}on{% endif %}"><svg class="ico"><use href="#i-book"/></svg> Flows</a>
     <div class="nav-cap">Manage</div>
     <a href="{{ url_for('dash.inbox') }}" class="{% if request.endpoint in ('dash.inbox','dash.inbox_status','dash.inbox_delete') %}on{% endif %}"><svg class="ico"><use href="#i-inbox"/></svg> Inbox{% if unread_count %}<span class="nav-badge">{{ unread_count }}</span>{% endif %}</a>
     <a href="{{ url_for('dash.insights') }}" class="{% if request.endpoint=='dash.insights' %}on{% endif %}"><svg class="ico"><use href="#i-chart"/></svg> Insights</a>

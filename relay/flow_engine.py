@@ -49,8 +49,10 @@ def _exec_choice(node, ctx, query=None):
     config = node.get("config", {})
     options = config.get("options", [])
     if not query:
+        # Include a prompt/message field from config so the user sees the question + options
+        prompt = config.get("prompt") or config.get("message") or "Please choose an option:"
         return {
-            "response": None,
+            "response": _interpolate(prompt, ctx),
             "next_node": None,
             "variables": {},
             "actions": [{"type": "show_options", "options": options}],
@@ -59,7 +61,14 @@ def _exec_choice(node, ctx, query=None):
     for opt in options:
         label = (opt.get("label") or "").strip().lower()
         if q == label or q in label or label in q:
-            return {"response": None, "next_node": opt.get("next_node"), "variables": {}, "actions": []}
+            # Save the user's choice in a variable
+            var_name = config.get("variable_name", "choice")
+            return {
+                "response": None,
+                "next_node": opt.get("next_node"),
+                "variables": {var_name: opt.get("label")},
+                "actions": []
+            }
     return {"response": "I didn't understand that choice. Please try again.", "next_node": None, "variables": {}, "actions": []}
 
 
@@ -189,14 +198,15 @@ def _exec_capture(node, ctx, query=None):
     return {"response": None, "next_node": next_node, "variables": {variable_name: query}, "actions": []}
 
 
-def _exec_handoff(node, ctx, conv_id=None, user=None):
+def _exec_handoff(node, ctx, conv_id=None, user=None, app=None, bot=None):
     config = node.get("config", {})
     message = _interpolate(config.get("message", ""), ctx)
     reason = config.get("reason", "flow_handoff")
-    if conv_id and user:
+    if conv_id and user and app:
         try:
-            from . import store as _store
-            _store.update_flow_session  # noqa
+            from . import store
+            store.set_conversation(app, conv_id, user["id"], status="needs_human")
+            store.handle_refund_request(app, conv_id, bot, user)
         except Exception:
             pass
     return {"response": message, "next_node": None, "variables": {},

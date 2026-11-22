@@ -123,12 +123,12 @@ def create_bot(app, user_id, name, description="", **kw):
     if isinstance(suggestions, str):
         suggestions = [s.strip() for s in suggestions.splitlines() if s.strip()][:4] or suggestions
     bid = _write(app, """INSERT INTO bots(user_id,name,description,slug,color,avatar_emoji,greeting,
-                suggestions,model,temperature,system_prompt,ask_email,created_at,updated_at)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                suggestions,model,temperature,system_prompt,ask_email,created_at,updated_at,flow)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                  (user_id, name, description, slug, kw.get("color", "#4f46e5"),
                   kw.get("avatar_emoji", ""), kw.get("greeting", "") or "",
                   json.dumps(suggestions), kw.get("model", ""), float(kw.get("temperature", 0.4) or 0.4),
-                  kw.get("system_prompt", "") or "", int(bool(kw.get("ask_email", True))), now(), now()))
+                  kw.get("system_prompt", "") or "", int(bool(kw.get("ask_email", True))), now(), now(), kw.get("flow")))
     seed_bot_content(app, bid, user_id, name)
     return get_bot(app, bid)
 
@@ -753,41 +753,40 @@ def update_flow_node(app, node_id, **fields):
 def delete_flow_node(app, node_id):
     _exec(app, "DELETE FROM flow_nodes WHERE node_id=?", (node_id,))
 
-
 def replace_flow_nodes(app, flow_id, nodes):
     conn = connect(app.config["DB_PATH"])
     try:
         conn.execute("DELETE FROM flow_nodes WHERE flow_id=?", (flow_id,))
         for n in nodes:
+            # Accept both frontend/API shapes: node_id/id, position_x/x, position_y/y, next_nodes/next
+            node_id = n.get("node_id") or n.get("id")
+            pos_x = float(n.get("position_x", n.get("x", 0)) or 0)
+            pos_y = float(n.get("position_y", n.get("y", 0)) or 0)
+            # next_nodes takes priority, fallback to next
+            if "next_nodes" in n:
+                next_nodes = n["next_nodes"]
+            else:
+                next_nodes = n.get("next", [])
+            # Ensure config and next_nodes are serialized if dicts/lists, parsed if JSON strings
+            config_val = n.get("config", {})
+            if isinstance(config_val, (dict, list)):
+                config_serialized = json.dumps(config_val)
+            elif isinstance(config_val, str):
+                try:
+                    config_serialized = json.loads(config_val) if config_val else "{}"
+                except (ValueError, TypeError):
+                    config_serialized = "{}"
+            else:
+                config_serialized = json.dumps(config_val) if config_val else "{}"
+            next_nodes_serialized = json.dumps(next_nodes) if not isinstance(next_nodes, str) else (json.loads(next_nodes) if next_nodes else [])
             conn.execute(
                 "INSERT INTO flow_nodes(flow_id, node_id, type, config, position_x, position_y, next_nodes, created_at)"
-                " VALUES(?,?,?,?,?,?,?,?)",
-                (flow_id, n["id"], n["type"],
-                 json.dumps(n.get("config", {})),
-                 n.get("x", 0), n.get("y", 0),
-                 json.dumps(n.get("next", [])), now()))
+                " VALUES(?,?,?,?,?,?,?,?)" ,
+                (flow_id, node_id, n["type"], config_serialized,
+                 pos_x, pos_y, next_nodes_serialized, now()))
         conn.commit()
     finally:
         conn.close()
-
-
-# ================================================================ flow sessions
-
-def create_flow_session(app, flow_id, user_id, bot_id, conversation_id=None):
-    return _write(app,
-        "INSERT INTO flow_sessions(flow_id, user_id, bot_id, conversation_id, variables, current_node_id, status, created_at, updated_at)"
-        " VALUES(?,?,?,?,?,?,?,?,?)",
-        (flow_id, user_id, bot_id, conversation_id, "{}", "", "active", now(), now()))
-
-
-def get_flow_session(app, session_id):
-    return _one(app, "SELECT * FROM flow_sessions WHERE id=?", (session_id,))
-
-
-def get_flow_session_by_conversation(app, conversation_id):
-    return _one(app,
-        "SELECT * FROM flow_sessions WHERE conversation_id=? AND status='active'"
-        " ORDER BY updated_at DESC LIMIT 1", (conversation_id,))
 
 
 def update_flow_session(app, session_id, **fields):

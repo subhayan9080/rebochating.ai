@@ -89,7 +89,8 @@ def overview():
 def chatbots():
     app, user, bots = ctx()
     bot = active_bot(app, user, bots)
-    return render_template("chatbots.html", user=user, bots=bots, bot=bot)
+    flows = store.list_flows(app, user["id"])
+    return render_template("chatbots.html", user=user, bots=bots, bot=bot, flows=flows)
 
 
 @bp.route("/chatbots/new", methods=["POST"])
@@ -98,9 +99,11 @@ def chatbot_new():
     app, user, _ = ctx()
     name = request.form.get("name", "").strip() or "Untitled bot"
     description = request.form.get("description", "").strip()
+    flow_id = request.form.get("flow_id", "").strip()
+    save_flow = "" if not flow_id.isdigit() else {"flow_id": int(flow_id)}
     from .rag import resolve_provider
     provider, _, _ = resolve_provider(app, user)
-    bot = store.create_bot(app, user["id"], name, description)
+    bot = store.create_bot(app, user["id"], name, description, save_flow)
     session["bot_id"] = bot["id"]
     flash(f"Chatbot “{bot['name']}” created. Add knowledge, then test it in the Playground.", "ok")
     return redirect(url_for("dash.chatbot_edit", bot_id=bot["id"]))

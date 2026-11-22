@@ -101,15 +101,12 @@ def answer_turn(app, bot, user, history: list[dict], query: str, conv_id: int | 
             session = flow_engine.start_session(flow_id, user["id"], bot["id"], conv_id)
         result = flow_engine.advance(session["id"], query)
         if result.get("response"):
-            store.add_message(app, conv_id, "assistant", result["response"],
-                              citations=result.get("citations"))
+            # NOTE: store.add_message is called by api.py, not here - to avoid double-saving
             if not store.get_conversation(app, conv_id).get("title"):
                 store.set_conversation(app, conv_id, user["id"], title=query[:60])
             return {"text": result["response"], "citations": result.get("citations") or [],
-                    "provider": result.get("provider", "flow"),
-                    "model": result.get("model", "flow"),
-                    "guardrail": None, "guardrail_reason": None}
-        # Flow is waiting for input or produced no response; fall through to RAG
+                    "provider": result.get("provider", "flow"), "model": result.get("model", "flow"),
+                    "guardrail": None, "guardrail_reason": None, "actions": result.get("actions", [])}
 
     index = rag.load_bot_index(app, bot["id"])
     hits = rag.bm25_search(index, query, k=4)
