@@ -214,13 +214,13 @@ def row_to_dict(row: sqlite3.Row | None) -> dict | None:
     if row is None:
         return None
     d = dict(row)
-    for k in ("suggestions", "citations", "guardrails", "flow_ctx"):
+    for k in ("suggestions", "citations", "guardrails", "flow_ctx", "flow"):
         if k in d and isinstance(d[k], str):
-            default = "{}" if k in ("guardrails", "flow_ctx") else "[]"
+            default = "{}" if k in ("guardrails", "flow_ctx", "flow") else "[]"
             try:
                 d[k] = json.loads(d[k] or default)
             except (ValueError, TypeError):
-                d[k] = {} if k in ("guardrails", "flow_ctx") else []
+                d[k] = {} if k in ("guardrails", "flow_ctx", "flow") else []
     return d
 
 
